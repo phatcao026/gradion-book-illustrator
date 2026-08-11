@@ -2,9 +2,7 @@
 
 ## Strategy
 
-Vitest is the single test runner for both sides of the application. The backend test uses an in-memory SQLite database and Supertest against the real Express application, so it verifies the HTTP status, JSON body, and database-backed health check without opening a network port. The frontend test uses React Testing Library with jsdom to verify that the placeholder page renders its primary heading and readiness message.
-
-This milestone deliberately does not test identity, project persistence, upload validation, pipeline ordering, retry behavior, concurrency claims, or Gemini interactions because none of those features exists yet. Those tests belong to the milestones described in `docs/pipeline.md`; adding mocks now would imply unsupported behavior.
+Vitest is the single test runner for both sides of the application. Backend integration tests use temporary on-disk SQLite databases and upload directories with Supertest against the real Express application. Frontend tests use React Testing Library with jsdom. Pipeline state tests inject only clocks and attempt IDs; they do not fake Gemini or expose a production runner.
 
 ## Commands
 
@@ -147,3 +145,61 @@ Performed by the project owner on 2026-08-11 against the local development stack
 7. Sign out returned to Identity; signing in with the original email reopened its projects, while a second email saw an isolated empty project list.
 
 This section records user-performed acceptance testing; it is not presented as automated coverage.
+
+## Milestone 2 coverage
+
+Backend tests cover ordered claims, one winner across two SQLite connections, an idempotent duplicate loser, failure context, error clearing and a new attempt ID on retry, conditional completion that rejects an old worker, exact stale-attempt recovery, a completion-versus-recovery race, pipeline state after reopening SQLite, derived project statuses, authenticated recovery API checks, and the declared server-owned character/chapter caps. Existing identity, project, upload, isolation, restart, and health tests remain in the full suite.
+
+Frontend tests cover persisted running, failed, stale, and interrupted views. They verify that a running action and pre-M3 retry actions remain disabled and that only a stale running state exposes the Recover callback. No Gemini request, generated result, or fake production provider is claimed.
+
+## Milestone 2 actual run
+
+Final `npm.cmd test` output on 2026-08-11:
+
+```text
+> gradion-book-illustrator@0.1.0 test
+> vitest run
+
+ RUN  v4.1.10 D:/Gradion/gradion-book-illustrator
+
+ Test Files  5 passed (5)
+      Tests  25 passed (25)
+   Start at  17:25:20
+   Duration  1.87s (transform 378ms, setup 941ms, import 1.53s, tests 1.75s, environment 2.04s)
+```
+
+Final `npm.cmd run build` output:
+
+```text
+> gradion-book-illustrator@0.1.0 build
+> npm run typecheck:client && npm run build:client && npm run build:server
+
+> gradion-book-illustrator@0.1.0 typecheck:client
+> tsc -p tsconfig.client.json --noEmit
+
+> gradion-book-illustrator@0.1.0 build:client
+> vite build
+
+vite v8.2.1 building client environment for production...
+✓ 111 modules transformed.
+dist/client/index.html                   0.48 kB │ gzip:  0.30 kB
+dist/client/assets/index-BHXnrZv6.css    8.85 kB │ gzip:  2.72 kB
+dist/client/assets/index-DxvaQWaQ.js   302.43 kB │ gzip: 93.00 kB
+✓ built in 222ms
+
+> gradion-book-illustrator@0.1.0 build:server
+> tsc -p tsconfig.server.json
+```
+
+Runtime smoke check: a dev server was already listening on port `3000`, and the additional Vite process selected `5174` because `5173` was occupied. The newly launched Vite page, direct health endpoint, and Vite-proxied health endpoint returned:
+
+```text
+HealthStatus    : 200
+HealthBody      : {"status":"ok"}
+FrontendStatus  : 200
+FrontendHasRoot : True
+ProxyStatus     : 200
+ProxyBody       : {"status":"ok"}
+```
+
+The additional `npm run dev` process tree was stopped after this check; the pre-existing development process was left untouched.

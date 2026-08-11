@@ -428,6 +428,16 @@ textarea:focus {
   background: var(--paper);
 }
 
+.status-pill.in_progress {
+  color: #8a460c;
+  background: #fff0df;
+}
+
+.status-pill.done {
+  color: #256343;
+  background: #e3f4e9;
+}
+
 .row-arrow {
   color: var(--orange-dark);
   font-weight: 850;
@@ -459,6 +469,7 @@ textarea:focus {
 }
 
 .project-form,
+.pipeline-panel,
 .book-panel {
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -522,6 +533,11 @@ textarea:focus {
   margin-top: 14px;
 }
 
+.pipeline-panel {
+  margin-bottom: 28px;
+  padding: clamp(24px, 5vw, 40px);
+}
+
 .step-preview {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -565,6 +581,45 @@ textarea:focus {
 
 .step-preview li.current span {
   background: var(--orange);
+}
+
+.step-preview li.complete {
+  border-color: #b7dec4;
+  color: #256343;
+  background: #f3faf5;
+}
+
+.step-preview li.complete span {
+  background: #37815a;
+}
+
+.pipeline-state {
+  padding: 22px;
+  border-radius: 12px;
+  background: #faf8f5;
+}
+
+.pipeline-state strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1rem;
+}
+
+.pipeline-state p {
+  margin: 0 0 18px;
+  color: var(--muted);
+}
+
+.pipeline-state.running {
+  background: #fff8f0;
+}
+
+.pipeline-state.failed {
+  background: #fff0ed;
+}
+
+.pipeline-state.interrupted {
+  background: #fff8df;
 }
 
 .book-panel {

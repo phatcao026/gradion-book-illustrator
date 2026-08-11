@@ -11,7 +11,7 @@ import express, {
   type Response,
 } from 'express';
 import multer from 'multer';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 
 import {
   identityInputSchema,
@@ -23,6 +23,12 @@ import {
 import { BookStorage } from './book-storage.js';
 import type { AppDatabase } from './database.js';
 import { AppRepository } from './repository.js';
+import {
+  DEFAULT_STALE_ATTEMPT_MS,
+  PipelineStateError,
+  PipelineStateService,
+  toProjectSummary,
+} from './pipeline-state.js';
 import {
   clearSessionCookieOptions,
   createSessionToken,
@@ -36,6 +42,7 @@ export interface AppDependencies {
   database: AppDatabase;
   uploadsDirectory: string;
   secureCookies?: boolean;
+  staleAttemptMs?: number;
 }
 
 class ApiError extends Error {
@@ -58,13 +65,20 @@ const upload = multer({
   },
 });
 
+const staleRecoverySchema = z.object({
+  attemptId: z.string().min(1),
+  startedAt: z.iso.datetime(),
+});
+
 export function createApp({
   database,
   uploadsDirectory,
   secureCookies = false,
+  staleAttemptMs = DEFAULT_STALE_ATTEMPT_MS,
 }: AppDependencies): Express {
   const app = express();
-  const repository = new AppRepository(database);
+  const repository = new AppRepository(database, staleAttemptMs);
+  const pipelineState = new PipelineStateService(database, { staleAttemptMs });
   const bookStorage = new BookStorage(uploadsDirectory);
 
   app.disable('x-powered-by');
@@ -194,15 +208,41 @@ export function createApp({
         }
 
         const project: ProjectDetail = {
-          id: row.id,
-          title: row.title,
-          createdAt: row.created_at,
-          status: 'DRAFT',
-          completedSteps: 0,
+          ...toProjectSummary(row, Date.now(), staleAttemptMs),
           bookText: await bookStorage.readBook(row.book_path),
         };
 
         response.status(200).json({ project });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    '/api/projects/:projectId/pipeline/recover',
+    requireSession(repository),
+    (request, response, next) => {
+      try {
+        const user = response.locals.user as SessionUser;
+        const projectId = request.params.projectId;
+        const input = staleRecoverySchema.parse(request.body);
+
+        if (typeof projectId !== 'string') {
+          throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project was not found.');
+        }
+
+        const result = pipelineState.recoverStaleAttempt({
+          userId: user.id,
+          projectId,
+          attemptId: input.attemptId,
+          observedStartedAt: Date.parse(input.startedAt),
+        });
+
+        response.status(200).json({
+          recovered: result.applied,
+          pipeline: result.state,
+        });
       } catch (error) {
         next(error);
       }
@@ -220,6 +260,14 @@ export function createApp({
         response
           .status(error.status)
           .json({ error: { code: error.code, message: error.message } });
+        return;
+      }
+
+      if (error instanceof PipelineStateError) {
+        const status = error.code === 'PROJECT_NOT_FOUND' ? 404 : 409;
+        response.status(status).json({
+          error: { code: error.code, message: error.message },
+        });
         return;
       }
 

@@ -40,7 +40,7 @@ Exit condition: a user can sign in, create a titled project from paste or `.txt`
 
 Decision checkpoint: update `DECISIONS.md` with any real choices about session representation, SQLite versus filesystem responsibilities, validation, or API shape before moving on.
 
-## Milestone 2 — Durable pipeline state and recovery UI
+## Milestone 2 — Durable pipeline state and recovery UI (completed)
 
 Backend and storage:
 

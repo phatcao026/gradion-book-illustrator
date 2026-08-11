@@ -54,12 +54,14 @@ export function ProjectListPage() {
                 <h2>{project.title}</h2>
                 <p>Created {formatDate(project.createdAt)}</p>
               </div>
-              <div className="progress" aria-label={`${project.completedSteps} of 5 steps complete`}>
+              <div className="progress" aria-label={`${project.pipeline.completedStep} of 5 steps complete`}>
                 {[0, 1, 2, 3, 4].map((step) => (
-                  <span className={step < project.completedSteps ? 'complete' : ''} key={step} />
+                  <span className={step < project.pipeline.completedStep ? 'complete' : ''} key={step} />
                 ))}
               </div>
-              <span className="status-pill draft">Draft</span>
+              <span className={`status-pill ${project.status.toLowerCase()}`}>
+                {statusLabel(project.status)}
+              </span>
               <span className="row-arrow" aria-hidden="true">→</span>
             </Link>
           ))}
@@ -67,6 +69,12 @@ export function ProjectListPage() {
       ) : null}
     </main>
   );
+}
+
+function statusLabel(status: ProjectSummary['status']): string {
+  if (status === 'IN_PROGRESS') return 'In progress';
+  if (status === 'DONE') return 'Done';
+  return 'Draft';
 }
 
 function formatDate(value: string): string {

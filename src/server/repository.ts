@@ -1,8 +1,10 @@
 import type { AppDatabase } from './database.js';
-import type {
-  ProjectSummary,
-  SessionUser,
-} from '../shared/contracts.js';
+import type { ProjectSummary, SessionUser } from '../shared/contracts.js';
+import {
+  DEFAULT_STALE_ATTEMPT_MS,
+  toProjectSummary,
+  type PipelineProjectRow,
+} from './pipeline-state.js';
 
 interface UserRow {
   id: string;
@@ -10,15 +12,13 @@ interface UserRow {
   email: string;
 }
 
-interface ProjectRow {
-  id: string;
-  title: string;
-  book_path: string;
-  created_at: string;
-}
+export type ProjectRow = PipelineProjectRow;
 
 export class AppRepository {
-  constructor(private readonly database: AppDatabase) {}
+  constructor(
+    private readonly database: AppDatabase,
+    private readonly staleAttemptMs = DEFAULT_STALE_ATTEMPT_MS,
+  ) {}
 
   upsertUser(user: SessionUser, createdAt: string): SessionUser {
     this.database
@@ -97,41 +97,45 @@ export class AppRepository {
       title: input.title,
       book_path: input.bookPath,
       created_at: input.createdAt,
-    });
+      completed_step: 0,
+      active_step: null,
+      run_state: 'IDLE',
+      attempt_id: null,
+      started_at: null,
+      error_code: null,
+      error_message: null,
+    }, Date.now(), this.staleAttemptMs);
   }
 
   listProjects(userId: string): ProjectSummary[] {
     const rows = this.database
       .prepare(`
-        SELECT id, title, book_path, created_at
+        SELECT id, title, book_path, created_at,
+               completed_step, active_step, run_state, attempt_id,
+               started_at, error_code, error_message
         FROM projects
         WHERE user_id = ?
         ORDER BY created_at DESC, id DESC
       `)
       .all(userId) as unknown as ProjectRow[];
 
-    return rows.map(toProjectSummary);
+    const now = Date.now();
+    return rows.map((row) =>
+      toProjectSummary(row, now, this.staleAttemptMs),
+    );
   }
 
   findProject(userId: string, projectId: string): ProjectRow | null {
     return (
       (this.database
         .prepare(`
-          SELECT id, title, book_path, created_at
+          SELECT id, title, book_path, created_at,
+                 completed_step, active_step, run_state, attempt_id,
+                 started_at, error_code, error_message
           FROM projects
           WHERE user_id = ? AND id = ?
         `)
         .get(userId, projectId) as unknown as ProjectRow | undefined) ?? null
     );
   }
-}
-
-function toProjectSummary(row: ProjectRow): ProjectSummary {
-  return {
-    id: row.id,
-    title: row.title,
-    createdAt: row.created_at,
-    status: 'DRAFT',
-    completedSteps: 0,
-  };
 }

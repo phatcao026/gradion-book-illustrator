@@ -58,6 +58,27 @@ export function openDatabase(databasePath: string): AppDatabase {
       ON projects(user_id, created_at DESC);
   `);
 
+  applyMigration(database, 3, `
+    ALTER TABLE projects
+      ADD COLUMN completed_step INTEGER NOT NULL DEFAULT 0
+      CHECK (completed_step BETWEEN 0 AND 5);
+
+    ALTER TABLE projects
+      ADD COLUMN active_step INTEGER
+      CHECK (active_step BETWEEN 1 AND 5);
+
+    ALTER TABLE projects
+      ADD COLUMN run_state TEXT NOT NULL DEFAULT 'IDLE'
+      CHECK (run_state IN ('IDLE', 'RUNNING', 'FAILED', 'INTERRUPTED'));
+
+    ALTER TABLE projects ADD COLUMN attempt_id TEXT;
+    ALTER TABLE projects ADD COLUMN started_at INTEGER;
+    ALTER TABLE projects ADD COLUMN error_code TEXT;
+    ALTER TABLE projects ADD COLUMN error_message TEXT;
+
+    CREATE INDEX projects_attempt_idx ON projects(attempt_id);
+  `);
+
   return database;
 }
 

@@ -1,5 +1,6 @@
 import type {
   IdentityInput,
+  PipelineState,
   ProjectDetail,
   ProjectSummary,
   SessionUser,
@@ -74,6 +75,25 @@ export async function getProject(projectId: string): Promise<ProjectDetail> {
   const response = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`);
   const body = (await response.json()) as { project: ProjectDetail };
   return body.project;
+}
+
+export async function recoverPipelineAttempt(
+  projectId: string,
+  attemptId: string,
+  startedAt: string,
+): Promise<{ recovered: boolean; pipeline: PipelineState }> {
+  const response = await apiFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/pipeline/recover`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ attemptId, startedAt }),
+    },
+  );
+  return (await response.json()) as {
+    recovered: boolean;
+    pipeline: PipelineState;
+  };
 }
 
 async function apiFetch(

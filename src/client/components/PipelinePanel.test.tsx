@@ -1,0 +1,102 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { PipelineState } from '../../shared/contracts';
+import { PipelinePanel } from './PipelinePanel';
+
+describe('PipelinePanel persisted states', () => {
+  it('renders a named running state and disables duplicate action', () => {
+    render(
+      <PipelinePanel
+        pipeline={state({
+          activeStep: 2,
+          nextStep: 2,
+          runState: 'RUNNING',
+          attemptId: 'attempt-running',
+          startedAt: '2026-08-11T03:00:00.000Z',
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Characters is running')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Characters in progress/ })).toBeDisabled();
+  });
+
+  it('renders a failed step without carrying the running presentation', () => {
+    render(
+      <PipelinePanel
+        pipeline={state({
+          completedStep: 1,
+          activeStep: 2,
+          nextStep: 2,
+          runState: 'FAILED',
+          attemptId: 'attempt-failed',
+          startedAt: '2026-08-11T03:00:00.000Z',
+          error: { code: 'PROVIDER_ERROR', message: 'Character generation failed.' },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Characters failed')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Character generation failed.');
+    expect(screen.getByRole('button', { name: /Retry Characters/ })).toBeDisabled();
+  });
+
+  it('offers a user-triggered recovery only for a stale running attempt', () => {
+    const onRecover = vi.fn();
+    render(
+      <PipelinePanel
+        onRecover={onRecover}
+        pipeline={state({
+          completedStep: 2,
+          activeStep: 3,
+          nextStep: 3,
+          runState: 'RUNNING',
+          attemptId: 'attempt-stale',
+          startedAt: '2026-08-11T02:00:00.000Z',
+          isStale: true,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recover interrupted attempt' }));
+    expect(onRecover).toHaveBeenCalledOnce();
+    expect(screen.getByText('Portraits appears interrupted')).toBeInTheDocument();
+  });
+
+  it('renders the persisted interrupted state and retained error', () => {
+    render(
+      <PipelinePanel
+        pipeline={state({
+          completedStep: 2,
+          activeStep: 3,
+          nextStep: 3,
+          runState: 'INTERRUPTED',
+          attemptId: 'attempt-interrupted',
+          startedAt: '2026-08-11T02:00:00.000Z',
+          error: {
+            code: 'STALE_ATTEMPT',
+            message: 'The previous attempt was interrupted and can be retried.',
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Portraits was interrupted')).toBeInTheDocument();
+    expect(screen.getByText(/previous attempt was interrupted/)).toBeInTheDocument();
+  });
+});
+
+function state(overrides: Partial<PipelineState>): PipelineState {
+  return {
+    completedStep: 0,
+    activeStep: null,
+    nextStep: 1,
+    runState: 'IDLE',
+    attemptId: null,
+    startedAt: null,
+    error: null,
+    isStale: false,
+    ...overrides,
+  };
+}

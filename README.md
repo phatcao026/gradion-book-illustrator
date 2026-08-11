@@ -1,6 +1,6 @@
 # Gradion Book Illustrator
 
-Local full-stack application for Gradion's book-illustration take-home assessment. The current milestone implements name/email identity, server-side sessions, user-isolated project persistence, pasted text and `.txt` uploads, and the initial project screens. The five-step Gemini illustration pipeline is intentionally not implemented yet.
+Local full-stack application for Gradion's book-illustration take-home assessment. The current milestone implements identity, user-isolated project persistence, and durable state/recovery for the ordered five-step illustration pipeline. Gemini execution and generated outputs are intentionally not implemented yet.
 
 ## Prerequisites
 
@@ -21,6 +21,7 @@ Current environment variables:
 - `PORT`: Express port; defaults to `3000`.
 - `DATABASE_PATH`: local SQLite file; defaults to `./data/gradion.sqlite`.
 - `UPLOADS_DIRECTORY`: local book/image root; defaults to `./uploads`.
+- `STALE_ATTEMPT_MINUTES`: age at which a running attempt can be manually recovered; defaults to `10`.
 
 Session cookies are marked `Secure` automatically when `NODE_ENV=production`; local HTTP development keeps that flag disabled.
 
@@ -41,9 +42,9 @@ During development, open `http://localhost:5173`. The backend listens on `http:/
 
 ## Current architecture
 
-- `src/client`: React Router screens for identity, project list, project creation, and project detail.
-- `src/server`: Express API, SHA-256 hashed cookie sessions, SQLite repositories/migrations, and atomic local book storage.
-- `src/shared`: Zod validation and DTO contracts shared by the browser and server.
+- `src/client`: React Router screens plus persisted pipeline progress, running/error/interrupted views, and stale recovery.
+- `src/server`: Express API, SHA-256 hashed cookie sessions, SQLite migrations, atomic local book storage, and conditional pipeline state transitions.
+- `src/shared`: validation and DTO contracts shared by the browser and server.
 - `data`: local SQLite runtime data, created automatically and ignored by Git.
 - `uploads`: user/project-isolated book text, created automatically and ignored by Git.
 

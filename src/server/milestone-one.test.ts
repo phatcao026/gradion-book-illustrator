@@ -108,7 +108,11 @@ describe('Milestone 1 identity and projects', () => {
     expect(created.body.project).toMatchObject({
       title: 'The River Story',
       status: 'DRAFT',
-      completedSteps: 0,
+      pipeline: {
+        completedStep: 0,
+        runState: 'IDLE',
+        nextStep: 1,
+      },
     });
 
     const row = database

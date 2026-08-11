@@ -87,7 +87,7 @@ describe('Milestone 1 frontend', () => {
             title: 'River Story',
             createdAt: '2026-08-11T00:00:00.000Z',
             status: 'DRAFT',
-            completedSteps: 0,
+            pipeline: idlePipeline,
             bookText: 'The complete book remains readable here.',
           },
         });
@@ -110,6 +110,17 @@ const sessionUser = {
   id: 'user-1',
   name: 'Mira Hassan',
   email: 'mira@example.com',
+};
+
+const idlePipeline = {
+  completedStep: 0,
+  activeStep: null,
+  nextStep: 1,
+  runState: 'IDLE',
+  attemptId: null,
+  startedAt: null,
+  error: null,
+  isStale: false,
 };
 
 function renderApp(initialEntry: string) {
