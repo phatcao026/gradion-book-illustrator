@@ -1,6 +1,6 @@
 # Gemini prompts used by the application
 
-This is the review artifact for the prompts used through M4. The executable source of truth is `src/server/gemini/prompts.ts`; changes to these prompts should update both places in the same commit.
+This is the review artifact for the prompts used across all five pipeline steps. The executable source of truth is `src/server/gemini/prompts.ts`; changes to these prompts should update both places in the same commit.
 
 ## Book context
 
@@ -104,8 +104,8 @@ The normal path chains directly from the final portrait interaction. If that con
 - Default image model: `gemini-3.1-flash-image`, configurable with `GEMINI_IMAGE_MODEL`.
 - Service tier: `standard` only.
 - Interactions are stored and chained using `previous_interaction_id`.
-- Portrait output requests PNG, `9:16`, and `1K`; PNG and JPEG responses are accepted only after byte-level validation.
-- Chapter Illustration output requests PNG, `16:9`, and `1K` through the same validation and storage boundary.
+- Portrait output requests JPEG, `9:16`, and `1K`; PNG and JPEG responses are accepted only after byte-level validation.
+- Chapter Illustration output requests JPEG, `16:9`, and `1K` through the same validation and storage boundary.
 - Search/grounding tools are not enabled for portrait generation.
 - The first actual portrait establishes image context; there is no separate paid seed-image call. Later portraits chain from the preceding portrait interaction.
 - When the image interaction expires, completed local portraits are supplied as references and only missing portraits are generated.

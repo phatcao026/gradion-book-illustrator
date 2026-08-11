@@ -22,6 +22,4 @@ This state model separates durable completed progress from the current execution
 
 ## HTTP mapping
 
-The real step-start endpoint will be added with the first Gemini-backed step in Milestone 3. Its claim result maps to `202 Accepted` when `claimed: true`, `200 OK` when a duplicate receives `claimed: false`, and `409 Conflict` only for a genuinely invalid step order.
-
-Milestone 2 exposes persisted state and stale recovery, but deliberately does not ship a fake production step runner.
+The implemented step-start endpoint maps its claim result to `202 Accepted` when `claimed: true`, `200 OK` when a duplicate receives `claimed: false`, and `409 Conflict` only for a genuinely invalid step order. Persisted state and stale recovery use the same conditional state model; production execution always uses the real configured gateway rather than a fake provider.

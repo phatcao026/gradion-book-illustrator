@@ -63,4 +63,4 @@ GitHub Actions is configured to run `npm ci`, `npm test`, and `npm run build` on
 
 The isolated final local pass covers the full automated suite, production build, health endpoint, validation, refresh, server restart, two-tab behavior, duplicate clicks, explicit retry, stale recovery, logout, keyboard affordances, and desktop layout without a Gemini key. On 2026-08-12 the project owner separately completed all five steps through the real UI with a billed Gemini project after the upload and image-format corrections. Model-level visual consistency was not independently scored. See `TESTING.md` for the exact evidence boundaries.
 
-See [TESTING.md](TESTING.md), [DECISIONS.md](DECISIONS.md), and [docs/pipeline.md](docs/pipeline.md) for the test boundary, decisions, and future milestones.
+See [TESTING.md](TESTING.md), [DECISIONS.md](DECISIONS.md), and [docs/pipeline.md](docs/pipeline.md) for the test boundary, decisions, and delivery record.
