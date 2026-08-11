@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 import type {
   CharacterResult,
+  PortraitStatus,
   StyleResult,
   StyleSource,
 } from '../shared/contracts.js';
 import type { AppDatabase } from './database.js';
 import type { UploadedGeminiFile } from './gemini/gemini-gateway.js';
+import type { StoredImageMimeType } from './image-storage.js';
 
 export interface PipelineExecutionContext {
   projectId: string;
@@ -28,6 +30,8 @@ export interface PipelineExecutionContext {
   styleSource: StyleSource | null;
   styleInput: string;
   styleText: string | null;
+  imageModel: string | null;
+  imageContextState: 'READY' | 'EXPIRED';
 }
 
 interface ExecutionRow {
@@ -50,12 +54,30 @@ interface ExecutionRow {
   style_source: StyleSource | null;
   style_input: string | null;
   style_text: string | null;
+  image_model: string | null;
+  image_context_state: 'READY' | 'EXPIRED';
 }
 
 interface CharacterRow {
   id: string;
   name: string;
   prompt: string;
+  portrait_status: PortraitStatus | null;
+  image_path: string | null;
+  mime_type: StoredImageMimeType | null;
+  interaction_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+}
+
+export interface PortraitWorkItem {
+  characterId: string;
+  name: string;
+  prompt: string;
+  status: PortraitStatus;
+  imagePath: string | null;
+  mimeType: StoredImageMimeType | null;
+  interactionId: string | null;
 }
 
 export class PipelineExecutionRepository {
@@ -101,6 +123,67 @@ export class PipelineExecutionRepository {
     return Number(result.changes) === 1;
   }
 
+  preparePortraitAttempt(input: {
+    userId: string;
+    projectId: string;
+    attemptId: string;
+    imageModel: string;
+    now: string;
+  }): boolean {
+    return this.inTransaction(() => {
+      const attempt: AttemptInput = { ...input, step: 3 };
+      if (!this.ownsAttempt(attempt)) return false;
+
+      const existing = this.database
+        .prepare(
+          'SELECT image_model FROM project_ai_contexts WHERE project_id = ?',
+        )
+        .get(input.projectId) as unknown as { image_model: string | null } | undefined;
+      if (!existing) return false;
+
+      this.database
+        .prepare(`
+          UPDATE project_ai_contexts
+          SET image_model = ?,
+              image_context_state = CASE
+                WHEN image_model IS NOT NULL AND image_model <> ?
+                  THEN 'EXPIRED'
+                ELSE image_context_state
+              END,
+              updated_at = ?
+          WHERE project_id = ?
+        `)
+        .run(input.imageModel, input.imageModel, input.now, input.projectId);
+
+      const characters = this.database
+        .prepare('SELECT id FROM characters WHERE project_id = ? ORDER BY ordinal')
+        .all(input.projectId) as unknown as Array<{ id: string }>;
+      const prepare = this.database.prepare(`
+        INSERT INTO character_portraits (
+          character_id, status, updated_at
+        ) VALUES (?, 'QUEUED', ?)
+        ON CONFLICT (character_id) DO UPDATE SET
+          status = CASE
+            WHEN character_portraits.status = 'COMPLETED' THEN 'COMPLETED'
+            ELSE 'QUEUED'
+          END,
+          error_code = CASE
+            WHEN character_portraits.status = 'COMPLETED'
+              THEN character_portraits.error_code
+            ELSE NULL
+          END,
+          error_message = CASE
+            WHEN character_portraits.status = 'COMPLETED'
+              THEN character_portraits.error_message
+            ELSE NULL
+          END,
+          updated_at = excluded.updated_at
+      `);
+      characters.forEach((character) => prepare.run(character.id, input.now));
+      return true;
+    });
+  }
+
   getContext(userId: string, projectId: string): PipelineExecutionContext | null {
     const row = this.database
       .prepare(`
@@ -112,7 +195,8 @@ export class PipelineExecutionRepository {
                context.gemini_file_expires_at, context.book_interaction_id,
                context.style_interaction_id,
                context.characters_interaction_id, context.style_source,
-               context.style_input, context.style_text
+               context.style_input, context.style_text,
+               context.image_model, context.image_context_state
         FROM projects
         LEFT JOIN project_ai_contexts AS context
           ON context.project_id = projects.id
@@ -135,9 +219,14 @@ export class PipelineExecutionRepository {
 
     const rows = this.database
       .prepare(`
-        SELECT characters.id, characters.name, characters.prompt
+        SELECT characters.id, characters.name, characters.prompt,
+               portraits.status AS portrait_status, portraits.image_path,
+               portraits.mime_type, portraits.interaction_id,
+               portraits.error_code, portraits.error_message
         FROM characters
         JOIN projects ON projects.id = characters.project_id
+        LEFT JOIN character_portraits AS portraits
+          ON portraits.character_id = characters.id
         WHERE characters.project_id = ? AND projects.user_id = ?
         ORDER BY characters.ordinal ASC
       `)
@@ -149,8 +238,194 @@ export class PipelineExecutionRepository {
         context.styleSource && context.styleText
           ? { source: context.styleSource, text: context.styleText }
           : null,
-      characters: rows,
+      characters: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        prompt: row.prompt,
+        portrait: row.portrait_status
+          ? {
+              status: row.portrait_status,
+              imageUrl:
+                row.portrait_status === 'COMPLETED'
+                  ? `/api/projects/${encodeURIComponent(projectId)}/characters/${encodeURIComponent(row.id)}/portrait`
+                  : null,
+              mimeType: row.mime_type,
+              error:
+                row.error_code && row.error_message
+                  ? { code: row.error_code, message: row.error_message }
+                  : null,
+            }
+          : null,
+      })),
     };
+  }
+
+  listPortraitWork(userId: string, projectId: string): PortraitWorkItem[] {
+    const rows = this.database
+      .prepare(`
+        SELECT characters.id, characters.name, characters.prompt,
+               portraits.status AS portrait_status, portraits.image_path,
+               portraits.mime_type, portraits.interaction_id,
+               portraits.error_code, portraits.error_message
+        FROM characters
+        JOIN projects ON projects.id = characters.project_id
+        JOIN character_portraits AS portraits
+          ON portraits.character_id = characters.id
+        WHERE characters.project_id = ? AND projects.user_id = ?
+        ORDER BY characters.ordinal ASC
+      `)
+      .all(projectId, userId) as unknown as CharacterRow[];
+    return rows.map((row) => ({
+      characterId: row.id,
+      name: row.name,
+      prompt: row.prompt,
+      status: requiredPortraitStatus(row.portrait_status),
+      imagePath: row.image_path,
+      mimeType: row.mime_type,
+      interactionId: row.interaction_id,
+    }));
+  }
+
+  markPortraitGenerating(
+    input: AttemptInput & { characterId: string },
+  ): boolean {
+    return this.updateForAttempt(
+      `
+        UPDATE character_portraits
+        SET status = 'GENERATING', error_code = NULL, error_message = NULL,
+            updated_at = ?
+        WHERE character_id = ? AND status <> 'COMPLETED' AND EXISTS (
+          SELECT 1 FROM characters
+          JOIN projects ON projects.id = characters.project_id
+          WHERE characters.id = character_portraits.character_id
+            AND projects.id = ? AND projects.user_id = ?
+            AND projects.run_state = 'RUNNING'
+            AND projects.active_step = ? AND projects.attempt_id = ?
+        )
+      `,
+      [
+        input.now,
+        input.characterId,
+        input.projectId,
+        input.userId,
+        input.step,
+        input.attemptId,
+      ],
+    );
+  }
+
+  completePortrait(input: AttemptInput & {
+    characterId: string;
+    imagePath: string;
+    mimeType: StoredImageMimeType;
+    interactionId: string;
+  }): boolean {
+    return this.inTransaction(() => {
+      const applied = this.updateForAttempt(
+        `
+          UPDATE character_portraits
+          SET status = 'COMPLETED', image_path = ?, mime_type = ?,
+              interaction_id = ?, error_code = NULL, error_message = NULL,
+              updated_at = ?
+          WHERE character_id = ? AND status = 'GENERATING' AND EXISTS (
+            SELECT 1 FROM characters
+            JOIN projects ON projects.id = characters.project_id
+            WHERE characters.id = character_portraits.character_id
+              AND projects.id = ? AND projects.user_id = ?
+              AND projects.run_state = 'RUNNING'
+              AND projects.active_step = ? AND projects.attempt_id = ?
+          )
+        `,
+        [
+          input.imagePath,
+          input.mimeType,
+          input.interactionId,
+          input.now,
+          input.characterId,
+          input.projectId,
+          input.userId,
+          input.step,
+          input.attemptId,
+        ],
+      );
+      if (!applied) return false;
+
+      this.database
+        .prepare(`
+          UPDATE project_ai_contexts
+          SET image_context_state = 'READY', updated_at = ?
+          WHERE project_id = ?
+        `)
+        .run(input.now, input.projectId);
+      return true;
+    });
+  }
+
+  failPortrait(input: AttemptInput & {
+    characterId: string;
+    error: { code: string; message: string };
+  }): boolean {
+    return this.updateForAttempt(
+      `
+        UPDATE character_portraits
+        SET status = 'FAILED', error_code = ?, error_message = ?, updated_at = ?
+        WHERE character_id = ? AND status <> 'COMPLETED' AND EXISTS (
+          SELECT 1 FROM characters
+          JOIN projects ON projects.id = characters.project_id
+          WHERE characters.id = character_portraits.character_id
+            AND projects.id = ? AND projects.user_id = ?
+            AND projects.run_state = 'RUNNING'
+            AND projects.active_step = ? AND projects.attempt_id = ?
+        )
+      `,
+      [
+        input.error.code,
+        input.error.message,
+        input.now,
+        input.characterId,
+        input.projectId,
+        input.userId,
+        input.step,
+        input.attemptId,
+      ],
+    );
+  }
+
+  markImageContextExpired(input: AttemptInput): boolean {
+    return this.updateForAttempt(
+      `
+        UPDATE project_ai_contexts
+        SET image_context_state = 'EXPIRED', updated_at = ?
+        WHERE project_id = ? AND EXISTS (
+          SELECT 1 FROM projects
+          WHERE id = project_ai_contexts.project_id AND user_id = ?
+            AND run_state = 'RUNNING' AND active_step = ? AND attempt_id = ?
+        )
+      `,
+      [input.now, input.projectId, input.userId, input.step, input.attemptId],
+    );
+  }
+
+  getPortraitImage(
+    userId: string,
+    projectId: string,
+    characterId: string,
+  ): { imagePath: string; mimeType: StoredImageMimeType } | null {
+    const row = this.database
+      .prepare(`
+        SELECT portraits.image_path, portraits.mime_type
+        FROM character_portraits AS portraits
+        JOIN characters ON characters.id = portraits.character_id
+        JOIN projects ON projects.id = characters.project_id
+        WHERE projects.id = ? AND projects.user_id = ?
+          AND characters.id = ? AND portraits.status = 'COMPLETED'
+      `)
+      .get(projectId, userId, characterId) as unknown as
+      | { image_path: string; mime_type: StoredImageMimeType }
+      | undefined;
+    return row
+      ? { imagePath: row.image_path, mimeType: row.mime_type }
+      : null;
   }
 
   persistUploadedFile(input: AttemptInput & { file: UploadedGeminiFile }): boolean {
@@ -360,7 +635,7 @@ export class PipelineExecutionRepository {
 interface AttemptInput {
   userId: string;
   projectId: string;
-  step: 1 | 2;
+  step: 1 | 2 | 3;
   attemptId: string;
   now: string;
 }
@@ -388,5 +663,12 @@ function mapExecutionRow(row: ExecutionRow): PipelineExecutionContext {
     styleSource: row.style_source,
     styleInput: row.style_input ?? '',
     styleText: row.style_text,
+    imageModel: row.image_model,
+    imageContextState: row.image_context_state,
   };
+}
+
+function requiredPortraitStatus(value: PortraitStatus | null): PortraitStatus {
+  if (!value) throw new Error('Portrait work is missing its persisted status.');
+  return value;
 }

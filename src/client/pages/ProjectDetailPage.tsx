@@ -107,7 +107,7 @@ export function ProjectDetailPage() {
   }
 
   async function startStep(step: PipelineStepNumber) {
-    if (!projectId || !project || (step !== 1 && step !== 2)) return;
+    if (!projectId || !project || (step !== 1 && step !== 2 && step !== 3)) return;
 
     setStarting(true);
     setError(null);
@@ -197,7 +197,10 @@ export function ProjectDetailPage() {
                 <div className="character-grid">
                   {project.characters.map((character) => (
                     <article className="character-card" key={character.id}>
-                      <div className="portrait-placeholder">Portrait not generated</div>
+                      <PortraitView
+                        name={character.name}
+                        portrait={character.portrait}
+                      />
                       <h3>{character.name}</h3>
                       <p>{character.prompt}</p>
                     </article>
@@ -221,6 +224,37 @@ export function ProjectDetailPage() {
       ) : null}
     </main>
   );
+}
+
+function PortraitView({
+  name,
+  portrait,
+}: {
+  name: string;
+  portrait: ProjectDetail['characters'][number]['portrait'];
+}) {
+  if (portrait?.status === 'COMPLETED' && portrait.imageUrl) {
+    return <img alt={`Portrait of ${name}`} className="portrait-image" src={portrait.imageUrl} />;
+  }
+  if (portrait?.status === 'GENERATING') {
+    return (
+      <div className="portrait-placeholder generating" role="status">
+        Generating portrait for {name}…
+      </div>
+    );
+  }
+  if (portrait?.status === 'QUEUED') {
+    return <div className="portrait-placeholder queued">Portrait queued</div>;
+  }
+  if (portrait?.status === 'FAILED') {
+    return (
+      <div className="portrait-placeholder failed">
+        <span>Portrait failed</span>
+        <small>{portrait.error?.message ?? 'Retry the Portraits step.'}</small>
+      </div>
+    );
+  }
+  return <div className="portrait-placeholder">Portrait not generated</div>;
 }
 
 function statusLabel(status: ProjectDetail['status']): string {

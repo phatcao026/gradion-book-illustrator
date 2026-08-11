@@ -89,11 +89,11 @@ Decision checkpoint: record the real REST-versus-SDK/model choice, structured va
 
 Implementation note: the official `@google/genai` gateway, stored interaction chain, intermediate SQLite persistence, explicit rehydration, Style/Character UI, polling, and fake-gateway automated coverage are complete. A real-key smoke call remains deliberately pending explicit project-owner approval; M3 should be marked fully completed only after that result is recorded honestly.
 
-## Milestone 4 — Portraits (step 3)
+## Milestone 4 — Portraits (step 3; implemented, real-key smoke pending)
 
 Integration:
 
-- Create and persist the separate image-context interaction with the established style and negative rules.
+- Establish image context with the first actual portrait request using the persisted style and negative rules; do not spend a separate image call on a seed-only interaction.
 - Generate at most two adult-character portraits sequentially, chaining each portrait from the previous image interaction as required by the notebook.
 - Validate response blocks and MIME types, decode image data safely, and write each completed portrait to the local filesystem immediately.
 - Persist per-item queued, generating, completed, and failed state so retry resumes only missing work.
@@ -110,6 +110,8 @@ Test focus: sequential chaining, response/MIME validation, safe local writes, pe
 Exit condition: step 3 cannot run before Characters, generates no more than two portraits, preserves each successful image, and supports retrying only missing work.
 
 Decision checkpoint: record the image decoding/storage design and any real simplification or correction of AI output. Do not claim a real image response passed unless a paid-key run actually succeeded.
+
+Implementation note: per-character SQLite state, sequential stored-interaction chaining, local-reference rebuilding, validated atomic image storage, authenticated image serving, Portrait UI states, and fake-gateway automated coverage are complete. A real-key paid image call remains deliberately pending and is not claimed as passed.
 
 ## Milestone 5 — Chapters and Illustrations (steps 4–5)
 

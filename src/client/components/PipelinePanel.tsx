@@ -26,7 +26,8 @@ export function PipelinePanel({
   const activeName = stepName(pipeline.activeStep);
   const nextName = stepName(pipeline.nextStep);
   const actionStep = pipeline.activeStep ?? pipeline.nextStep;
-  const m3ActionAvailable = actionStep === 1 || actionStep === 2;
+  const actionAvailable =
+    actionStep === 1 || actionStep === 2 || actionStep === 3;
   const canEditStyle =
     actionStep === 1 &&
     pipeline.completedStep === 0 &&
@@ -108,13 +109,13 @@ export function PipelinePanel({
             <p role="alert">{pipeline.error?.message ?? 'The step did not finish.'}</p>
             <button
               className="primary-button"
-              disabled={!m3ActionAvailable || starting || !onStart || !actionStep}
+              disabled={!actionAvailable || starting || !onStart || !actionStep}
               onClick={() => actionStep && onStart?.(actionStep)}
               type="button"
             >
               {starting
                 ? `Starting ${activeName}…`
-                : m3ActionAvailable
+                : actionAvailable
                   ? `Retry ${activeName}`
                   : `Retry ${activeName} — available in a later milestone`}
             </button>
@@ -125,13 +126,13 @@ export function PipelinePanel({
             <p>{pipeline.error?.message ?? 'The attempt is safe to retry.'}</p>
             <button
               className="primary-button"
-              disabled={!m3ActionAvailable || starting || !onStart || !actionStep}
+              disabled={!actionAvailable || starting || !onStart || !actionStep}
               onClick={() => actionStep && onStart?.(actionStep)}
               type="button"
             >
               {starting
                 ? `Starting ${activeName}…`
-                : m3ActionAvailable
+                : actionAvailable
                   ? `Retry ${activeName}`
                   : `Retry ${activeName} — available in a later milestone`}
             </button>
@@ -140,19 +141,19 @@ export function PipelinePanel({
           <>
             <strong>{nextName} is ready</strong>
             <p>
-              {m3ActionAvailable
+              {actionAvailable
                 ? 'This action sends the saved book context to Gemini.'
                 : 'This step will be connected in the next milestone.'}
             </p>
             <button
               className="primary-button"
-              disabled={!m3ActionAvailable || starting || !onStart || !actionStep}
+              disabled={!actionAvailable || starting || !onStart || !actionStep}
               onClick={() => actionStep && onStart?.(actionStep)}
               type="button"
             >
               {starting
                 ? `Starting ${nextName}…`
-                : m3ActionAvailable
+                : actionAvailable
                   ? `Generate ${nextName}`
                   : `Generate ${nextName} — available in a later milestone`}
             </button>

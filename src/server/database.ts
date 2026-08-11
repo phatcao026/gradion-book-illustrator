@@ -111,6 +111,31 @@ export function openDatabase(databasePath: string): AppDatabase {
     CREATE INDEX characters_project_idx ON characters(project_id, ordinal);
   `);
 
+  applyMigration(database, 5, `
+    ALTER TABLE project_ai_contexts ADD COLUMN image_model TEXT;
+    ALTER TABLE project_ai_contexts
+      ADD COLUMN image_context_state TEXT NOT NULL DEFAULT 'READY'
+      CHECK (image_context_state IN ('READY', 'EXPIRED'));
+
+    CREATE TABLE character_portraits (
+      character_id TEXT PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+      status TEXT NOT NULL
+        CHECK (status IN ('QUEUED', 'GENERATING', 'COMPLETED', 'FAILED')),
+      image_path TEXT UNIQUE,
+      mime_type TEXT CHECK (mime_type IN ('image/png', 'image/jpeg')),
+      interaction_id TEXT,
+      error_code TEXT,
+      error_message TEXT,
+      updated_at TEXT NOT NULL,
+      CHECK (
+        status <> 'COMPLETED'
+        OR (image_path IS NOT NULL AND mime_type IS NOT NULL AND interaction_id IS NOT NULL)
+      )
+    );
+
+    CREATE INDEX character_portraits_status_idx ON character_portraits(status);
+  `);
+
   return database;
 }
 

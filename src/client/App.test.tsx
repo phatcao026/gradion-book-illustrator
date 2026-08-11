@@ -130,6 +130,7 @@ describe('Milestone 1 frontend', () => {
                 id: 'character-1',
                 name: 'Mara',
                 prompt: 'A consistent adult portrait prompt with clothing and lighting details.',
+                portrait: null,
               },
             ],
           },
@@ -143,6 +144,70 @@ describe('Milestone 1 frontend', () => {
     expect(await screen.findByText('Layered watercolor washes.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Mara' })).toBeInTheDocument();
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
+  });
+
+  it('renders completed and failed portrait item states', async () => {
+    stubFetch((input) => {
+      const url = String(input);
+      if (url === '/api/session') return jsonResponse({ user: sessionUser });
+      if (url === '/api/projects/project-3') {
+        return jsonResponse({
+          project: {
+            id: 'project-3',
+            title: 'Portrait Story',
+            createdAt: '2026-08-11T00:00:00.000Z',
+            status: 'IN_PROGRESS',
+            pipeline: {
+              ...idlePipeline,
+              completedStep: 2,
+              activeStep: 3,
+              nextStep: 3,
+              runState: 'FAILED',
+              attemptId: 'portrait-attempt',
+              error: { code: 'GEMINI_REQUEST_FAILED', message: 'Portrait generation stopped.' },
+            },
+            bookText: 'A saved portrait story.',
+            styleInput: '',
+            style: { source: 'GENERATED', text: 'Layered watercolor.' },
+            characters: [
+              {
+                id: 'character-1',
+                name: 'Mara',
+                prompt: 'An adult river guide.',
+                portrait: {
+                  status: 'COMPLETED',
+                  imageUrl: '/api/projects/project-3/characters/character-1/portrait',
+                  mimeType: 'image/png',
+                  error: null,
+                },
+              },
+              {
+                id: 'character-2',
+                name: 'Theo',
+                prompt: 'An adult cartographer.',
+                portrait: {
+                  status: 'FAILED',
+                  imageUrl: null,
+                  mimeType: null,
+                  error: { code: 'GEMINI_REQUEST_FAILED', message: 'Image request failed.' },
+                },
+              },
+            ],
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    renderApp('/projects/project-3');
+
+    expect(await screen.findByAltText('Portrait of Mara')).toHaveAttribute(
+      'src',
+      '/api/projects/project-3/characters/character-1/portrait',
+    );
+    expect(screen.getByText('Portrait failed')).toBeInTheDocument();
+    expect(screen.getByText('Image request failed.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry Portraits' })).toBeEnabled();
   });
 });
 

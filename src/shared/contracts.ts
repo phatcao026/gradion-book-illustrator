@@ -13,6 +13,7 @@ export type PipelineStepNumber = 1 | 2 | 3 | 4 | 5;
 export type PipelineRunState = 'IDLE' | 'RUNNING' | 'FAILED' | 'INTERRUPTED';
 export type ProjectStatus = 'DRAFT' | 'IN_PROGRESS' | 'DONE';
 export type StyleSource = 'USER' | 'GENERATED';
+export type PortraitStatus = 'QUEUED' | 'GENERATING' | 'COMPLETED' | 'FAILED';
 
 export interface PipelineError {
   code: string;
@@ -39,6 +40,14 @@ export interface CharacterResult {
   id: string;
   name: string;
   prompt: string;
+  portrait: PortraitResult | null;
+}
+
+export interface PortraitResult {
+  status: PortraitStatus;
+  imageUrl: string | null;
+  mimeType: 'image/png' | 'image/jpeg' | null;
+  error: PipelineError | null;
 }
 
 export const styleInputSchema = z

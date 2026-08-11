@@ -85,6 +85,31 @@ describe('PipelinePanel persisted states', () => {
     expect(onStart).toHaveBeenCalledWith(2);
   });
 
+  it('starts Portraits explicitly and keeps Chapters unavailable', () => {
+    const onStart = vi.fn();
+    const { rerender } = render(
+      <PipelinePanel
+        onStart={onStart}
+        pipeline={state({ completedStep: 2, nextStep: 3 })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Portraits' }));
+    expect(onStart).toHaveBeenCalledWith(3);
+
+    rerender(
+      <PipelinePanel
+        onStart={onStart}
+        pipeline={state({ completedStep: 3, nextStep: 4 })}
+      />,
+    );
+    expect(
+      screen.getByRole('button', {
+        name: /Generate Chapters — available in a later milestone/,
+      }),
+    ).toBeDisabled();
+  });
+
   it('offers a user-triggered recovery only for a stale running attempt', () => {
     const onRecover = vi.fn();
     render(

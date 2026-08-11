@@ -1,6 +1,6 @@
 # Gemini prompts used by the application
 
-This is the review artifact for the M3 prompts. The executable source of truth is `src/server/gemini/prompts.ts`; changes to these prompts should update both places in the same commit.
+This is the review artifact for the prompts used through M4. The executable source of truth is `src/server/gemini/prompts.ts`; changes to these prompts should update both places in the same commit.
 
 ## Book context
 
@@ -41,10 +41,39 @@ Do not include children, chapter descriptions, or image data.
 
 The request also uses a JSON response schema for an array of `{ name, prompt }` objects with `maxItems: 2`. The server independently parses strict JSON, permits zero to two entries, rejects duplicate case-insensitive names, and applies length limits before writing any character row.
 
+## Adult Character Portrait
+
+Sent once per persisted adult character. The placeholders are replaced with server-persisted, validated values. The final reference sentence changes depending on whether an expired image chain is being rebuilt from completed local portraits.
+
+```text
+Create one 9:16 portrait illustration of the adult character {characterName}.
+Character description: {characterPrompt}
+Art direction: {style}
+{referenceInstruction}
+Compose one centered adult character in a clear portrait pose with an uncluttered supporting background.
+Produce a single full-bleed family-friendly illustration with uplifting colors, no panels, borders, title, caption, typography, or written text.
+```
+
+Normal first portrait instruction:
+
+```text
+Establish the visual identity for this cast and keep it reusable in later chained images.
+```
+
+Expired-chain rebuild instruction:
+
+```text
+Use the supplied completed portraits as visual references for a consistent cast and art direction.
+```
+
 ## Execution settings
 
 - Default text model: `gemini-3.6-flash`, configurable with `GEMINI_TEXT_MODEL`.
+- Default image model: `gemini-3.1-flash-image`, configurable with `GEMINI_IMAGE_MODEL`.
 - Service tier: `standard` only.
 - Interactions are stored and chained using `previous_interaction_id`.
+- Portrait output requests PNG, `9:16`, and `1K`; PNG and JPEG responses are accepted only after byte-level validation.
+- Search/grounding tools are not enabled for portrait generation.
+- The first actual portrait establishes image context; there is no separate paid seed-image call. Later portraits chain from the preceding portrait interaction.
+- When the image interaction expires, completed local portraits are supplied as references and only missing portraits are generated.
 - SDK automatic retries: `0`; every retry must be initiated by the user.
-- Image prompts and image-generation mechanics are intentionally outside M3.

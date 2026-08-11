@@ -28,6 +28,11 @@ import {
   type GeminiGateway,
   UnconfiguredGeminiGateway,
 } from './gemini/gemini-gateway.js';
+import {
+  type GeminiImageGateway,
+  UnconfiguredGeminiImageGateway,
+} from './gemini/image-gateway.js';
+import { ImageStorage } from './image-storage.js';
 import { PipelineExecutionRepository } from './pipeline-execution-repository.js';
 import { PipelineRunner } from './pipeline-runner.js';
 import { AppRepository } from './repository.js';
@@ -52,6 +57,7 @@ export interface AppDependencies {
   secureCookies?: boolean;
   staleAttemptMs?: number;
   geminiGateway?: GeminiGateway;
+  geminiImageGateway?: GeminiImageGateway;
   scheduleBackgroundTask?: (task: () => Promise<void>) => void;
 }
 
@@ -86,18 +92,24 @@ export function createApp({
   secureCookies = false,
   staleAttemptMs = DEFAULT_STALE_ATTEMPT_MS,
   geminiGateway = new UnconfiguredGeminiGateway('gemini-3.6-flash'),
+  geminiImageGateway = new UnconfiguredGeminiImageGateway(
+    'gemini-3.1-flash-image',
+  ),
   scheduleBackgroundTask = defaultBackgroundScheduler,
 }: AppDependencies): Express {
   const app = express();
   const repository = new AppRepository(database, staleAttemptMs);
   const pipelineState = new PipelineStateService(database, { staleAttemptMs });
   const bookStorage = new BookStorage(uploadsDirectory);
+  const imageStorage = new ImageStorage(uploadsDirectory);
   const executionRepository = new PipelineExecutionRepository(database);
   const pipelineRunner = new PipelineRunner(
     geminiGateway,
     executionRepository,
     pipelineState,
     bookStorage,
+    geminiImageGateway,
+    imageStorage,
   );
 
   app.disable('x-powered-by');
@@ -239,6 +251,37 @@ export function createApp({
     },
   );
 
+  app.get(
+    '/api/projects/:projectId/characters/:characterId/portrait',
+    requireSession(repository),
+    async (request, response, next) => {
+      try {
+        const user = response.locals.user as SessionUser;
+        const projectId = request.params.projectId;
+        const characterId = request.params.characterId;
+        if (typeof projectId !== 'string' || typeof characterId !== 'string') {
+          throw new ApiError(404, 'PORTRAIT_NOT_FOUND', 'Portrait was not found.');
+        }
+
+        const portrait = executionRepository.getPortraitImage(
+          user.id,
+          projectId,
+          characterId,
+        );
+        if (!portrait) {
+          throw new ApiError(404, 'PORTRAIT_NOT_FOUND', 'Portrait was not found.');
+        }
+
+        const bytes = await imageStorage.readImage(portrait.imagePath);
+        response.setHeader('Content-Type', portrait.mimeType);
+        response.setHeader('Cache-Control', 'private, max-age=3600');
+        response.status(200).send(bytes);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   app.post(
     '/api/projects/:projectId/pipeline/steps/:step/start',
     requireSession(repository),
@@ -246,13 +289,13 @@ export function createApp({
       try {
         const user = response.locals.user as SessionUser;
         const projectId = request.params.projectId;
-        const step = parseM3Step(request.params.step);
+        const step = parseAvailableStep(request.params.step);
         const input = pipelineStartInputSchema.parse(request.body ?? {});
 
         if (typeof projectId !== 'string') {
           throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project was not found.');
         }
-        if (step === 2 && input.style.length > 0) {
+        if (step !== 1 && input.style.length > 0) {
           throw new ApiError(
             400,
             'VALIDATION_ERROR',
@@ -288,6 +331,26 @@ export function createApp({
             throw new PipelineStateError(
               'STATE_CHANGED',
               'The Style request could not be prepared.',
+            );
+          }
+
+          if (
+            step === 3 &&
+            !executionRepository.preparePortraitAttempt({
+              userId: user.id,
+              projectId,
+              attemptId,
+              imageModel: geminiImageGateway.model,
+              now: new Date().toISOString(),
+            })
+          ) {
+            pipelineState.failAttempt(user.id, projectId, attemptId, {
+              code: 'PIPELINE_PREPARATION_FAILED',
+              message: 'The Portraits request could not be saved before execution.',
+            });
+            throw new PipelineStateError(
+              'STATE_CHANGED',
+              'The Portraits request could not be prepared.',
             );
           }
 
@@ -399,18 +462,18 @@ export function createApp({
   return app;
 }
 
-function parseM3Step(
+function parseAvailableStep(
   value: string | string[] | undefined,
-): Extract<PipelineStepNumber, 1 | 2> {
+): Extract<PipelineStepNumber, 1 | 2 | 3> {
   if (Array.isArray(value)) {
     throw new ApiError(409, 'STEP_NOT_AVAILABLE', 'Invalid pipeline step.');
   }
   const step = Number(value);
-  if (step === 1 || step === 2) return step;
+  if (step === 1 || step === 2 || step === 3) return step;
   throw new ApiError(
     409,
     'STEP_NOT_AVAILABLE',
-    'Only Style and Characters are available in Milestone 3.',
+    'Only Style, Characters, and Portraits are available through Milestone 4.',
   );
 }
 

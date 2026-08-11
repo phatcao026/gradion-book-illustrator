@@ -691,6 +691,41 @@ textarea:focus {
   letter-spacing: 0.05em;
 }
 
+.portrait-placeholder.generating {
+  border-color: var(--grad-orange);
+  color: var(--grad-ink);
+  background: #fff8df;
+}
+
+.portrait-placeholder.queued {
+  background: #f4f2ee;
+}
+
+.portrait-placeholder.failed {
+  gap: 8px;
+  padding: 18px;
+  color: #8b2f24;
+  background: #fff0ed;
+  text-align: center;
+}
+
+.portrait-placeholder.failed small {
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.portrait-image {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  display: block;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f4f2ee;
+}
+
 .book-panel {
   padding: clamp(24px, 5vw, 40px);
 }
