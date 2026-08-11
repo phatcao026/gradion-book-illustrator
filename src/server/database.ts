@@ -79,6 +79,38 @@ export function openDatabase(databasePath: string): AppDatabase {
     CREATE INDEX projects_attempt_idx ON projects(attempt_id);
   `);
 
+  applyMigration(database, 4, `
+    CREATE TABLE project_ai_contexts (
+      project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+      text_model TEXT NOT NULL,
+      context_state TEXT NOT NULL DEFAULT 'READY'
+        CHECK (context_state IN ('READY', 'EXPIRED')),
+      gemini_file_name TEXT,
+      gemini_file_uri TEXT,
+      gemini_file_expires_at TEXT,
+      book_interaction_id TEXT,
+      style_interaction_id TEXT,
+      characters_interaction_id TEXT,
+      style_source TEXT CHECK (style_source IN ('USER', 'GENERATED')),
+      style_input TEXT NOT NULL DEFAULT '',
+      style_text TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE characters (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      ordinal INTEGER NOT NULL CHECK (ordinal BETWEEN 0 AND 1),
+      name TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (project_id, ordinal),
+      UNIQUE (project_id, name COLLATE NOCASE)
+    );
+
+    CREATE INDEX characters_project_idx ON characters(project_id, ordinal);
+  `);
+
   return database;
 }
 

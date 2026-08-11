@@ -5,6 +5,28 @@ import type { PipelineState } from '../../shared/contracts';
 import { PipelinePanel } from './PipelinePanel';
 
 describe('PipelinePanel persisted states', () => {
+  it('collects optional style direction and starts Style only on user action', () => {
+    const onStart = vi.fn();
+    const onStyleInputChange = vi.fn();
+    render(
+      <PipelinePanel
+        onStart={onStart}
+        onStyleInputChange={onStyleInputChange}
+        pipeline={state({})}
+        styleInput="Paper collage"
+      />,
+    );
+
+    expect(screen.getByLabelText('Optional art style')).toHaveValue('Paper collage');
+    fireEvent.change(screen.getByLabelText('Optional art style'), {
+      target: { value: 'Watercolor' },
+    });
+    expect(onStyleInputChange).toHaveBeenCalledWith('Watercolor');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Style' }));
+    expect(onStart).toHaveBeenCalledWith(1);
+  });
+
   it('renders a named running state and disables duplicate action', () => {
     render(
       <PipelinePanel
@@ -40,6 +62,27 @@ describe('PipelinePanel persisted states', () => {
     expect(screen.getByText('Characters failed')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Character generation failed.');
     expect(screen.getByRole('button', { name: /Retry Characters/ })).toBeDisabled();
+  });
+
+  it('enables an explicit Characters retry without showing the Style editor', () => {
+    const onStart = vi.fn();
+    render(
+      <PipelinePanel
+        onStart={onStart}
+        pipeline={state({
+          completedStep: 1,
+          activeStep: 2,
+          nextStep: 2,
+          runState: 'FAILED',
+          attemptId: 'attempt-failed',
+          error: { code: 'PROVIDER_ERROR', message: 'Try again.' },
+        })}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Optional art style')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Characters' }));
+    expect(onStart).toHaveBeenCalledWith(2);
   });
 
   it('offers a user-triggered recovery only for a stale running attempt', () => {

@@ -1,6 +1,7 @@
 import type {
   IdentityInput,
   PipelineState,
+  PipelineStepNumber,
   ProjectDetail,
   ProjectSummary,
   SessionUser,
@@ -92,6 +93,25 @@ export async function recoverPipelineAttempt(
   );
   return (await response.json()) as {
     recovered: boolean;
+    pipeline: PipelineState;
+  };
+}
+
+export async function startPipelineStep(
+  projectId: string,
+  step: PipelineStepNumber,
+  style = '',
+): Promise<{ claimed: boolean; pipeline: PipelineState }> {
+  const response = await apiFetch(
+    `/api/projects/${encodeURIComponent(projectId)}/pipeline/steps/${step}/start`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(step === 1 ? { style } : {}),
+    },
+  );
+  return (await response.json()) as {
+    claimed: boolean;
     pipeline: PipelineState;
   };
 }

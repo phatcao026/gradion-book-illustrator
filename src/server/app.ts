@@ -16,12 +16,20 @@ import { z, ZodError } from 'zod';
 import {
   identityInputSchema,
   MAX_BOOK_BYTES,
+  pipelineStartInputSchema,
   projectTitleSchema,
+  type PipelineStepNumber,
   type ProjectDetail,
   type SessionUser,
 } from '../shared/contracts.js';
 import { BookStorage } from './book-storage.js';
 import type { AppDatabase } from './database.js';
+import {
+  type GeminiGateway,
+  UnconfiguredGeminiGateway,
+} from './gemini/gemini-gateway.js';
+import { PipelineExecutionRepository } from './pipeline-execution-repository.js';
+import { PipelineRunner } from './pipeline-runner.js';
 import { AppRepository } from './repository.js';
 import {
   DEFAULT_STALE_ATTEMPT_MS,
@@ -43,6 +51,8 @@ export interface AppDependencies {
   uploadsDirectory: string;
   secureCookies?: boolean;
   staleAttemptMs?: number;
+  geminiGateway?: GeminiGateway;
+  scheduleBackgroundTask?: (task: () => Promise<void>) => void;
 }
 
 class ApiError extends Error {
@@ -75,11 +85,20 @@ export function createApp({
   uploadsDirectory,
   secureCookies = false,
   staleAttemptMs = DEFAULT_STALE_ATTEMPT_MS,
+  geminiGateway = new UnconfiguredGeminiGateway('gemini-3.6-flash'),
+  scheduleBackgroundTask = defaultBackgroundScheduler,
 }: AppDependencies): Express {
   const app = express();
   const repository = new AppRepository(database, staleAttemptMs);
   const pipelineState = new PipelineStateService(database, { staleAttemptMs });
   const bookStorage = new BookStorage(uploadsDirectory);
+  const executionRepository = new PipelineExecutionRepository(database);
+  const pipelineRunner = new PipelineRunner(
+    geminiGateway,
+    executionRepository,
+    pipelineState,
+    bookStorage,
+  );
 
   app.disable('x-powered-by');
   app.use(express.json({ limit: '32kb' }));
@@ -210,9 +229,82 @@ export function createApp({
         const project: ProjectDetail = {
           ...toProjectSummary(row, Date.now(), staleAttemptMs),
           bookText: await bookStorage.readBook(row.book_path),
+          ...executionRepository.getOutputs(user.id, projectId),
         };
 
         response.status(200).json({ project });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    '/api/projects/:projectId/pipeline/steps/:step/start',
+    requireSession(repository),
+    (request, response, next) => {
+      try {
+        const user = response.locals.user as SessionUser;
+        const projectId = request.params.projectId;
+        const step = parseM3Step(request.params.step);
+        const input = pipelineStartInputSchema.parse(request.body ?? {});
+
+        if (typeof projectId !== 'string') {
+          throw new ApiError(404, 'PROJECT_NOT_FOUND', 'Project was not found.');
+        }
+        if (step === 2 && input.style.length > 0) {
+          throw new ApiError(
+            400,
+            'VALIDATION_ERROR',
+            'Style input is accepted only when starting the Style step.',
+          );
+        }
+
+        const claim = pipelineState.claimStep(user.id, projectId, step);
+        if (claim.claimed) {
+          const attemptId = claim.state.attemptId;
+          if (!attemptId) {
+            throw new PipelineStateError(
+              'STATE_CHANGED',
+              'The claimed attempt is missing its identifier.',
+            );
+          }
+
+          if (
+            step === 1 &&
+            !executionRepository.prepareStyleAttempt({
+              userId: user.id,
+              projectId,
+              attemptId,
+              styleInput: input.style,
+              textModel: geminiGateway.model,
+              now: new Date().toISOString(),
+            })
+          ) {
+            pipelineState.failAttempt(user.id, projectId, attemptId, {
+              code: 'PIPELINE_PREPARATION_FAILED',
+              message: 'The Style request could not be saved before execution.',
+            });
+            throw new PipelineStateError(
+              'STATE_CHANGED',
+              'The Style request could not be prepared.',
+            );
+          }
+
+          scheduleBackgroundTask(() =>
+            pipelineRunner.runAttempt({
+              userId: user.id,
+              projectId,
+              step,
+              attemptId,
+            }),
+          );
+        }
+
+        response.status(claim.claimed ? 202 : 200).json({
+          claimed: claim.claimed,
+          pipeline: claim.state,
+        });
       } catch (error) {
         next(error);
       }
@@ -305,6 +397,29 @@ export function createApp({
   );
 
   return app;
+}
+
+function parseM3Step(
+  value: string | string[] | undefined,
+): Extract<PipelineStepNumber, 1 | 2> {
+  if (Array.isArray(value)) {
+    throw new ApiError(409, 'STEP_NOT_AVAILABLE', 'Invalid pipeline step.');
+  }
+  const step = Number(value);
+  if (step === 1 || step === 2) return step;
+  throw new ApiError(
+    409,
+    'STEP_NOT_AVAILABLE',
+    'Only Style and Characters are available in Milestone 3.',
+  );
+}
+
+function defaultBackgroundScheduler(task: () => Promise<void>): void {
+  setImmediate(() => {
+    void task().catch((error) => {
+      console.error('Unhandled pipeline background task failure', error);
+    });
+  });
 }
 
 function requireSession(repository: AppRepository): RequestHandler {

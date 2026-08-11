@@ -470,6 +470,7 @@ textarea:focus {
 
 .project-form,
 .pipeline-panel,
+.result-panel,
 .book-panel {
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -536,6 +537,30 @@ textarea:focus {
 .pipeline-panel {
   margin-bottom: 28px;
   padding: clamp(24px, 5vw, 40px);
+}
+
+.result-panel {
+  margin-bottom: 28px;
+  padding: clamp(24px, 5vw, 40px);
+}
+
+.style-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.style-field textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.style-field small {
+  color: var(--muted);
+  font-weight: 500;
+  text-align: right;
 }
 
 .step-preview {
@@ -620,6 +645,50 @@ textarea:focus {
 
 .pipeline-state.interrupted {
   background: #fff8df;
+}
+
+.result-copy {
+  margin: 0;
+  color: #434343;
+  font: 1rem/1.75 Georgia, serif;
+  white-space: pre-wrap;
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.character-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #faf8f5;
+}
+
+.character-card h3 {
+  margin: 18px 0 8px;
+}
+
+.character-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.portrait-placeholder {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #bab7b1;
+  border-radius: 10px;
+  color: #919699;
+  background: var(--white);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .book-panel {

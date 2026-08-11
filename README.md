@@ -1,6 +1,6 @@
 # Gradion Book Illustrator
 
-Local full-stack application for Gradion's book-illustration take-home assessment. The current milestone implements identity, user-isolated project persistence, and durable state/recovery for the ordered five-step illustration pipeline. Gemini execution and generated outputs are intentionally not implemented yet.
+Local full-stack application for Gradion's book-illustration take-home assessment. The current milestone implements identity, user-isolated project persistence, durable pipeline recovery, and the Gemini-backed Style and adult-Character steps. Portrait, chapter, and illustration generation remain intentionally unavailable.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ npm install
 cp .env.example .env
 ```
 
-Copying `.env` is optional for the current defaults. On PowerShell, use `Copy-Item .env.example .env`.
+On PowerShell, use `Copy-Item .env.example .env`. The app and health endpoint run without a Gemini key, but starting Style will persist a clear configuration failure until `GEMINI_API_KEY` is set.
 
 Current environment variables:
 
@@ -22,6 +22,9 @@ Current environment variables:
 - `DATABASE_PATH`: local SQLite file; defaults to `./data/gradion.sqlite`.
 - `UPLOADS_DIRECTORY`: local book/image root; defaults to `./uploads`.
 - `STALE_ATTEMPT_MINUTES`: age at which a running attempt can be manually recovered; defaults to `10`.
+- `GEMINI_API_KEY`: Gemini Developer API key; no default and never committed.
+- `GEMINI_TEXT_MODEL`: current text model; defaults to `gemini-3.6-flash`.
+- `GEMINI_SERVICE_TIER`: fixed to `standard`; another value is rejected at startup.
 
 Session cookies are marked `Secure` automatically when `NODE_ENV=production`; local HTTP development keeps that flag disabled.
 
@@ -42,12 +45,15 @@ During development, open `http://localhost:5173`. The backend listens on `http:/
 
 ## Current architecture
 
-- `src/client`: React Router screens plus persisted pipeline progress, running/error/interrupted views, and stale recovery.
-- `src/server`: Express API, SHA-256 hashed cookie sessions, SQLite migrations, atomic local book storage, and conditional pipeline state transitions.
+- `src/client`: React Router screens, 1.5-second polling while a step runs, Style input/result, Character cards, and persisted running/error/recovery views.
+- `src/server`: Express API, SHA-256 hashed cookie sessions, SQLite migrations, atomic local book storage, conditional pipeline writes, and an official Gemini SDK gateway.
 - `src/shared`: validation and DTO contracts shared by the browser and server.
+- `docs/ai/prompts.md`: the Gemini prompts and execution settings actually used in M3.
 - `data`: local SQLite runtime data, created automatically and ignored by Git.
 - `uploads`: user/project-isolated book text, created automatically and ignored by Git.
 
 The project uses one npm package and one `npm run dev` process supervisor to keep setup small. SQLite and local filesystem storage require no external service, so Docker would add setup overhead without solving a current dependency.
+
+M3 uses stored Gemini Interactions and persists each reusable identifier or validated output before the next external call. The SDK is configured with zero automatic retries; only the Generate/Retry buttons can issue a new attempt. Automated tests use a fake only at the `GeminiGateway` boundary and do not claim that a real API call passed.
 
 See [TESTING.md](TESTING.md), [DECISIONS.md](DECISIONS.md), and [docs/pipeline.md](docs/pipeline.md) for the test boundary, decisions, and future milestones.

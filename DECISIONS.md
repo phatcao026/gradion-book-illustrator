@@ -1,27 +1,37 @@
 # Decisions
 
-This log contains only choices that were actually made while building the application. It is kept incrementally and does not invent disagreement or AI overrides after the fact.
+This log contains only choices that were actually made while building the application. It is intentionally curated to remain a decision record, not a milestone diary.
 
-## TypeScript full stack in one npm package
+## One local TypeScript stack with SQLite and filesystem storage
 
-The initial AI analysis recommended TypeScript throughout, with React and Vite for the frontend and Express for the backend. I accepted that direction because one language across both runtimes and Vite's short feedback loop fit a time-boxed assessment. Codex kept the client and server in one npm package and used Vite's `/api` proxy instead of introducing a workspace or custom launcher. The cost is a shared dependency manifest, while separate source trees and TypeScript configurations must continue to enforce the runtime boundary.
-
-## SQLite instead of JSON files for durable state
-
-The assessment permits JSON files, but the AI handoff recommended SQLite and I accepted it because later milestones require atomic duplicate-execution claims, user isolation, conditional writes, and durable recovery. Implementing those guarantees on JSON would mean designing custom locking and concurrent-write behavior. We use Node's built-in `node:sqlite` module to avoid a native dependency. The accepted cost is requiring Node 24 or newer and maintaining explicit schema migrations.
+The initial AI analysis recommended TypeScript throughout, React + Vite, Express, SQLite, and one npm package. I accepted that direction because a single language and dependency manifest keep a time-boxed local assessment easy to run. SQLite owns relational and pipeline state, while book text and later image bytes belong on the filesystem; Node's built-in `node:sqlite` avoids a native package. The accepted costs are Node 24 or newer, explicit migrations, and a clear client/server boundary enforced by separate TypeScript configurations rather than separate packages.
 
 ## Opaque database sessions instead of JWT
 
-Codex proposed a random opaque session token in an HTTP-only cookie rather than trusting an email header or adding JWT signing-key management. I accepted the approach and required the implementation details to be explicit: only a SHA-256 token hash is stored in SQLite, sessions expire after seven days, and the cookie is `Secure` in production while remaining usable over local HTTP in development. `SameSite=Lax`, same-origin APIs, and no cross-origin CORS cover the current CSRF boundary, so an additional CSRF-token system would add complexity without a matching risk in this local application. The cost is one database lookup per authenticated request and server-side session cleanup over time.
+Codex proposed a random opaque session token in an HTTP-only cookie rather than trusting an email header or adding JWT signing-key management. I accepted it and required the security details to be explicit: only a SHA-256 token hash is stored, sessions expire after seven days, and the cookie is `Secure` in production but remains usable over local HTTP in development. `SameSite=Lax`, same-origin JSON APIs, and no cross-origin CORS cover the current CSRF boundary, so a separate CSRF-token system would not match this application's risk. The cost is a database lookup per authenticated request and eventual session cleanup.
 
-## File first, visible project second
+## File first, visible project second — user override
 
-Codex initially proposed a single multipart project endpoint with in-memory upload validation, but left the ordering between the filesystem write and SQLite insert undefined. I pushed back because inserting the row first could expose a project whose book file failed to write. We now validate exactly one source, decode uploaded `.txt` data as non-empty UTF-8, write a temporary file and atomically rename it, then insert the project row; a failed insert triggers best-effort file cleanup. This favors database integrity. The remaining crash window can leave an invisible orphan file, but never a visible project that points to missing text.
+Codex proposed one multipart endpoint with in-memory validation but initially left the SQLite/file ordering undefined. I pushed back because inserting the row first could expose a project whose book failed to persist. The implementation validates exactly one source, decodes uploaded `.txt` data as non-empty UTF-8, writes a temporary file and atomically renames it, then inserts the row; a failed insert triggers best-effort cleanup. A crash can still leave an invisible orphan file, but it cannot leave a visible project pointing at missing text.
 
-## Separate completed progress from the current attempt
+## Attempt-owned pipeline state and exact recovery — user override
 
-Codex proposed storing completed progress separately from the current run, and I accepted it after requiring a transition table before implementation. Each claim atomically checks the ordered step and observed state, creates a new UUID attempt, and clears old errors. Completion and failure apply only to the matching running attempt, so an old worker cannot overwrite a retry. Failed and interrupted attempts retain their identifiers for debugging, while a retry replaces the identifier and clears errors. Duplicate claims are normal idempotent responses (`claimed: false`), not conflicts; only invalid ordering is a conflict. This adds state fields and conditional SQL, but makes refresh, duplicate tabs, retries, and partial failure deterministic.
+Codex proposed separating completed progress from the current run, and I accepted it after requiring the transitions and race behavior to be explicit. A claim atomically checks ownership, order, and state, creates a new attempt UUID, and clears old errors. Every intermediate and final write checks the matching running attempt, so an old worker cannot overwrite a retry. A duplicate start returns `200` with `claimed: false` and the current state because a second tab is normal idempotent behavior, not an application error.
 
-## User-triggered stale recovery without a fake runner
+I also tightened the proposed stale recovery: the update itself must re-check `attempt_id`, the observed `started_at`, the running state, ownership, and the cutoff. It cannot trust a previous GET. Completion winning that race therefore makes Recover a no-op. Failed and interrupted attempts retain their identifier for diagnosis; retry creates a new one and clears the error.
 
-I required stale recovery to re-check the exact `attempt_id`, observed `started_at`, running state, ownership, and cutoff in the update itself rather than trust an earlier GET. A completion that wins the race therefore makes Recover a no-op. The threshold defaults to ten minutes and is configurable. We also explicitly chose not to add a fake pipeline provider in M2, keeping the service pure and using component fixtures only in tests: a production start endpoint that performs no real work would leave projects falsely running and would be discarded in M3. The tradeoff is that generate/retry actions remain visibly disabled until real Gemini execution is added; stale recovery is the only live M2 pipeline action.
+## Official Gemini SDK, Standard tier, and zero automatic retries — AI correction
+
+For M3 I chose the official `@google/genai` SDK behind a small `GeminiGateway`, a configurable current text model (`gemini-3.6-flash` by default), stored Interactions, and Standard service tier. The gateway makes prompts and structured response settings reviewable while tests substitute a fake only at this boundary. The server validates the structured character result again and accepts zero to two adults; a model schema alone is not treated as a trustworthy cap.
+
+The notebook and SDK defaults retry requests automatically, which conflicts with the assessment's cost rule. Codex initially set the Files API's `retryOptions.attempts` to `1`, incorrectly treating it as one total attempt. Reading the installed SDK showed that value maps directly to `maxRetries`, so it still meant one retry. I corrected both SDK paths to `0`. A failure is persisted and only a new user action can issue another Gemini request.
+
+## Persist interaction boundaries and rebuild expired context
+
+M3 runs each claimed step in an in-process background task and the browser polls persisted project state. This is deliberately smaller than a durable job queue; if the process dies, the existing stale-attempt recovery makes the interruption visible and retryable. File references, interaction IDs, style input, validated output, and character rows are saved at each successful boundary, so retry resumes after the last durable call rather than resending completed work.
+
+Gemini-hosted files and stored interactions are not permanent. The local book remains the source of truth. When Gemini reports the stored chain as expired, the server marks that context expired and fails the current attempt. On an explicit retry it uploads the local book again, recreates the book interaction, and, when necessary, replays the already-persisted style into the new chain without regenerating or replacing the user's completed Style result. This adds rehydration logic but avoids pretending remote identifiers are durable application state.
+
+## If I had one more day
+
+I would finish the image steps and spend the remaining time on a paid-key end-to-end run with deliberate mid-step failures, because image response handling and cross-restart resume behavior carry the largest remaining correctness and cost risk.

@@ -12,6 +12,7 @@ export const PIPELINE_STEPS = [
 export type PipelineStepNumber = 1 | 2 | 3 | 4 | 5;
 export type PipelineRunState = 'IDLE' | 'RUNNING' | 'FAILED' | 'INTERRUPTED';
 export type ProjectStatus = 'DRAFT' | 'IN_PROGRESS' | 'DONE';
+export type StyleSource = 'USER' | 'GENERATED';
 
 export interface PipelineError {
   code: string;
@@ -28,6 +29,26 @@ export interface PipelineState {
   error: PipelineError | null;
   isStale: boolean;
 }
+
+export interface StyleResult {
+  source: StyleSource;
+  text: string;
+}
+
+export interface CharacterResult {
+  id: string;
+  name: string;
+  prompt: string;
+}
+
+export const styleInputSchema = z
+  .string()
+  .trim()
+  .max(2_000, 'Style must be 2,000 characters or fewer.');
+
+export const pipelineStartInputSchema = z.object({
+  style: styleInputSchema.optional().default(''),
+});
 
 export const identityInputSchema = z.object({
   name: z.string().trim().min(2, 'Name must have at least 2 characters.').max(100),
@@ -63,4 +84,7 @@ export interface ProjectSummary {
 
 export interface ProjectDetail extends ProjectSummary {
   bookText: string;
+  style: StyleResult | null;
+  styleInput: string;
+  characters: CharacterResult[];
 }

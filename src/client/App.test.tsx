@@ -89,6 +89,9 @@ describe('Milestone 1 frontend', () => {
             status: 'DRAFT',
             pipeline: idlePipeline,
             bookText: 'The complete book remains readable here.',
+            styleInput: '',
+            style: null,
+            characters: [],
           },
         });
       }
@@ -103,6 +106,43 @@ describe('Milestone 1 frontend', () => {
     expect(
       screen.getByText('The complete book remains readable here.'),
     ).toBeInTheDocument();
+  });
+
+  it('renders persisted Style and Character outputs on project detail', async () => {
+    stubFetch((input) => {
+      const url = String(input);
+      if (url === '/api/session') {
+        return jsonResponse({ user: sessionUser });
+      }
+      if (url === '/api/projects/project-2') {
+        return jsonResponse({
+          project: {
+            id: 'project-2',
+            title: 'Forest Story',
+            createdAt: '2026-08-11T00:00:00.000Z',
+            status: 'IN_PROGRESS',
+            pipeline: { ...idlePipeline, completedStep: 2, nextStep: 3 },
+            bookText: 'A saved forest story.',
+            styleInput: '',
+            style: { source: 'GENERATED', text: 'Layered watercolor washes.' },
+            characters: [
+              {
+                id: 'character-1',
+                name: 'Mara',
+                prompt: 'A consistent adult portrait prompt with clothing and lighting details.',
+              },
+            ],
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    renderApp('/projects/project-2');
+
+    expect(await screen.findByText('Layered watercolor washes.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Mara' })).toBeInTheDocument();
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
   });
 });
 

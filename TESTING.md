@@ -203,3 +203,61 @@ ProxyBody       : {"status":"ok"}
 ```
 
 The additional `npm run dev` process tree was stopped after this check; the pre-existing development process was left untouched.
+
+## Milestone 3 coverage
+
+Backend M3 integration tests use the real Express routes, temporary filesystem storage, and temporary SQLite databases with a fake injected only at the `GeminiGateway` boundary. They cover both generated and user-provided Style paths, zero and two adult characters, ordered execution, one idempotent loser for duplicate starts, stored interaction reuse, immediate intermediate persistence, retry from the last successful boundary, server rejection of more than two characters, error clearing, and explicit context rebuilding after Gemini reports an expired chain. Separate gateway tests inspect the exact SDK request construction for upload, prompts, stored interaction chaining, Standard tier, structured response schema, context-expiry normalization, and zero automatic retries.
+
+Frontend tests cover editable Style input before step 1, the user-triggered Generate action, enabled retry for the failed current M3 step, no Style editing after completion, and rendering persisted Style and Character results. Portraits remain a visible placeholder and steps 3–5 remain disabled.
+
+These tests do not call Gemini and do not claim that a real API key, model response, or image flow passed. The real-key M3 smoke check is pending explicit project-owner approval.
+
+## Milestone 3 actual run
+
+Final `npm.cmd test` output on 2026-08-11:
+
+```text
+> gradion-book-illustrator@0.1.0 test
+> vitest run
+
+ RUN  v4.1.10 D:/Gradion/gradion-book-illustrator
+
+ Test Files  7 passed (7)
+      Tests  39 passed (39)
+   Start at  19:02:47
+   Duration  2.36s (transform 697ms, setup 1.85s, import 3.18s, tests 3.45s, environment 2.47s)
+```
+
+Final `npm.cmd run build` output:
+
+```text
+> gradion-book-illustrator@0.1.0 build
+> npm run typecheck:client && npm run build:client && npm run build:server
+
+> gradion-book-illustrator@0.1.0 typecheck:client
+> tsc -p tsconfig.client.json --noEmit
+
+> gradion-book-illustrator@0.1.0 build:client
+> vite build
+
+vite v8.2.1 building client environment for production...
+✓ 111 modules transformed.
+dist/client/index.html                   0.48 kB │ gzip:  0.30 kB
+dist/client/assets/index-pJaJpH7p.css    9.70 kB │ gzip:  2.88 kB
+dist/client/assets/index-Dkc-PaZs.js   305.59 kB │ gzip: 93.72 kB
+✓ built in 144ms
+
+> gradion-book-illustrator@0.1.0 build:server
+> tsc -p tsconfig.server.json
+```
+
+Built-server smoke check used isolated port `3301`, database `./data/m3-smoke.sqlite`, and no Gemini key:
+
+```text
+API listening on http://localhost:3301
+
+StatusCode : 200
+Body       : {"status":"ok"}
+```
+
+The smoke process was stopped and its temporary database was removed afterward. This verifies server startup and SQLite health only; it is not presented as a Gemini integration result.

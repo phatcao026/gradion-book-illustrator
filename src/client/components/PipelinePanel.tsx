@@ -7,16 +7,30 @@ import {
 interface PipelinePanelProps {
   pipeline: PipelineState;
   recovering?: boolean;
+  starting?: boolean;
+  styleInput?: string;
   onRecover?: () => void;
+  onStart?: (step: PipelineStepNumber) => void;
+  onStyleInputChange?: (value: string) => void;
 }
 
 export function PipelinePanel({
   pipeline,
   recovering = false,
+  starting = false,
+  styleInput = '',
   onRecover,
+  onStart,
+  onStyleInputChange,
 }: PipelinePanelProps) {
   const activeName = stepName(pipeline.activeStep);
   const nextName = stepName(pipeline.nextStep);
+  const actionStep = pipeline.activeStep ?? pipeline.nextStep;
+  const m3ActionAvailable = actionStep === 1 || actionStep === 2;
+  const canEditStyle =
+    actionStep === 1 &&
+    pipeline.completedStep === 0 &&
+    pipeline.runState !== 'RUNNING';
 
   return (
     <section className="pipeline-panel" aria-labelledby="pipeline-title">
@@ -48,6 +62,20 @@ export function PipelinePanel({
       </ol>
 
       <div className={`pipeline-state ${pipeline.runState.toLowerCase()}`}>
+        {canEditStyle ? (
+          <div className="style-field">
+            <label htmlFor="pipeline-style-input">Optional art style</label>
+            <textarea
+              id="pipeline-style-input"
+              maxLength={2_000}
+              onChange={(event) => onStyleInputChange?.(event.target.value)}
+              placeholder="Leave blank and Gemini will choose a style for the book."
+              rows={3}
+              value={styleInput}
+            />
+            <small>{styleInput.length.toLocaleString()} / 2,000 characters</small>
+          </div>
+        ) : null}
         {pipeline.completedStep === 5 ? (
           <>
             <strong>Illustration pipeline complete</strong>
@@ -78,24 +106,55 @@ export function PipelinePanel({
           <>
             <strong>{activeName} failed</strong>
             <p role="alert">{pipeline.error?.message ?? 'The step did not finish.'}</p>
-            <button className="primary-button" disabled type="button">
-              Retry {activeName} — available in M3
+            <button
+              className="primary-button"
+              disabled={!m3ActionAvailable || starting || !onStart || !actionStep}
+              onClick={() => actionStep && onStart?.(actionStep)}
+              type="button"
+            >
+              {starting
+                ? `Starting ${activeName}…`
+                : m3ActionAvailable
+                  ? `Retry ${activeName}`
+                  : `Retry ${activeName} — available in a later milestone`}
             </button>
           </>
         ) : pipeline.runState === 'INTERRUPTED' ? (
           <>
             <strong>{activeName} was interrupted</strong>
             <p>{pipeline.error?.message ?? 'The attempt is safe to retry.'}</p>
-            <button className="primary-button" disabled type="button">
-              Retry {activeName} — available in M3
+            <button
+              className="primary-button"
+              disabled={!m3ActionAvailable || starting || !onStart || !actionStep}
+              onClick={() => actionStep && onStart?.(actionStep)}
+              type="button"
+            >
+              {starting
+                ? `Starting ${activeName}…`
+                : m3ActionAvailable
+                  ? `Retry ${activeName}`
+                  : `Retry ${activeName} — available in a later milestone`}
             </button>
           </>
         ) : (
           <>
             <strong>{nextName} is ready</strong>
-            <p>Pipeline execution will be connected to Gemini in Milestone 3.</p>
-            <button className="primary-button" disabled type="button">
-              Generate {nextName} — available in M3
+            <p>
+              {m3ActionAvailable
+                ? 'This action sends the saved book context to Gemini.'
+                : 'This step will be connected in the next milestone.'}
+            </p>
+            <button
+              className="primary-button"
+              disabled={!m3ActionAvailable || starting || !onStart || !actionStep}
+              onClick={() => actionStep && onStart?.(actionStep)}
+              type="button"
+            >
+              {starting
+                ? `Starting ${nextName}…`
+                : m3ActionAvailable
+                  ? `Generate ${nextName}`
+                  : `Generate ${nextName} — available in a later milestone`}
             </button>
           </>
         )}

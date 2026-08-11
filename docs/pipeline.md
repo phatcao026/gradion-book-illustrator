@@ -64,7 +64,7 @@ Exit condition: pipeline state survives refresh and restart, duplicate starts ar
 
 Decision checkpoint: record the actual progress model, duplicate-execution strategy, stale threshold/recovery design, and any genuine AI proposal that was rejected or simplified.
 
-## Milestone 3 — Style and Characters (steps 1–2)
+## Milestone 3 — Style and Characters (steps 1–2; implemented, real-key smoke pending)
 
 Integration:
 
@@ -86,6 +86,8 @@ Test focus: both style paths, request construction, text interaction reuse, stru
 Exit condition: steps 1 and 2 run only in order, survive refresh/restart, expose no duplicate calls, and render their persisted outputs.
 
 Decision checkpoint: record the real REST-versus-SDK/model choice, structured validation approach, and any genuine AI override. Do not claim image mechanics were verified here.
+
+Implementation note: the official `@google/genai` gateway, stored interaction chain, intermediate SQLite persistence, explicit rehydration, Style/Character UI, polling, and fake-gateway automated coverage are complete. A real-key smoke call remains deliberately pending explicit project-owner approval; M3 should be marked fully completed only after that result is recorded honestly.
 
 ## Milestone 4 — Portraits (step 3)
 

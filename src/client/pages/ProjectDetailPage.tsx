@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import type { ProjectDetail } from '../../shared/contracts';
-import { getProject, recoverPipelineAttempt } from '../api';
+import type { PipelineStepNumber, ProjectDetail } from '../../shared/contracts';
+import {
+  getProject,
+  recoverPipelineAttempt,
+  startPipelineStep,
+} from '../api';
 import { PipelinePanel } from '../components/PipelinePanel';
 
 export function ProjectDetailPage() {
@@ -10,6 +14,7 @@ export function ProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -31,6 +36,38 @@ export function ProjectDetailPage() {
       active = false;
     };
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || project?.pipeline.runState !== 'RUNNING') return;
+
+    let active = true;
+    let requestInFlight = false;
+    const interval = window.setInterval(() => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      void getProject(projectId)
+        .then((item) => {
+          if (active) setProject(item);
+        })
+        .catch((requestError: unknown) => {
+          if (active) {
+            setError(
+              requestError instanceof Error
+                ? requestError.message
+                : 'Project progress could not be refreshed.',
+            );
+          }
+        })
+        .finally(() => {
+          requestInFlight = false;
+        });
+    }, 1_500);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [projectId, project?.pipeline.runState]);
 
   async function recoverAttempt() {
     if (
@@ -69,6 +106,37 @@ export function ProjectDetailPage() {
     }
   }
 
+  async function startStep(step: PipelineStepNumber) {
+    if (!projectId || !project || (step !== 1 && step !== 2)) return;
+
+    setStarting(true);
+    setError(null);
+    try {
+      const result = await startPipelineStep(
+        projectId,
+        step,
+        step === 1 ? project.styleInput : '',
+      );
+      setProject((current) =>
+        current
+          ? {
+              ...current,
+              status: statusFromPipeline(result.pipeline),
+              pipeline: result.pipeline,
+            }
+          : current,
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'The pipeline step could not be started.',
+      );
+    } finally {
+      setStarting(false);
+    }
+  }
+
   return (
     <main className="content-page">
       <Link className="back-link" to="/projects">← Back to projects</Link>
@@ -88,9 +156,56 @@ export function ProjectDetailPage() {
 
           <PipelinePanel
             onRecover={project.pipeline.isStale ? recoverAttempt : undefined}
+            onStart={startStep}
+            onStyleInputChange={(styleInput) =>
+              setProject((current) =>
+                current ? { ...current, styleInput } : current,
+              )
+            }
             pipeline={project.pipeline}
             recovering={recovering}
+            starting={starting}
+            styleInput={project.styleInput}
           />
+
+          {project.style ? (
+            <section className="result-panel" aria-labelledby="style-result-title">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">
+                    {project.style.source === 'USER' ? 'Your art direction' : 'Gemini art direction'}
+                  </p>
+                  <h2 id="style-result-title">Art style</h2>
+                </div>
+              </div>
+              <p className="result-copy">{project.style.text}</p>
+            </section>
+          ) : null}
+
+          {project.pipeline.completedStep >= 2 ? (
+            <section className="result-panel" aria-labelledby="characters-title">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Adult characters</p>
+                  <h2 id="characters-title">Character prompts</h2>
+                </div>
+                <span>{project.characters.length} / 2</span>
+              </div>
+              {project.characters.length === 0 ? (
+                <div className="notice">No adult characters were found in this book.</div>
+              ) : (
+                <div className="character-grid">
+                  {project.characters.map((character) => (
+                    <article className="character-card" key={character.id}>
+                      <div className="portrait-placeholder">Portrait not generated</div>
+                      <h3>{character.name}</h3>
+                      <p>{character.prompt}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : null}
 
           <section className="book-panel" aria-labelledby="book-text-title">
             <div className="section-heading">
