@@ -12,18 +12,78 @@ export function openDatabase(databasePath: string): AppDatabase {
 
   const database = new DatabaseSync(databasePath);
 
+  database.exec('PRAGMA foreign_keys = ON;');
   database.exec(`
-    PRAGMA foreign_keys = ON;
-
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
       applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const hasInitialMigration = database
+    .prepare('SELECT 1 FROM schema_migrations WHERE version = 1')
+    .get();
+
+  if (!hasInitialMigration) {
+    database.prepare('INSERT INTO schema_migrations (version) VALUES (1)').run();
+  }
+
+  applyMigration(database, 2, `
+    CREATE TABLE users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      created_at TEXT NOT NULL
     );
 
-    INSERT INTO schema_migrations (version)
-    VALUES (1)
-    ON CONFLICT (version) DO NOTHING;
+    CREATE TABLE sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX sessions_user_id_idx ON sessions(user_id);
+    CREATE INDEX sessions_expires_at_idx ON sessions(expires_at);
+
+    CREATE TABLE projects (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      book_path TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX projects_user_created_idx
+      ON projects(user_id, created_at DESC);
   `);
 
   return database;
+}
+
+function applyMigration(
+  database: AppDatabase,
+  version: number,
+  statements: string,
+): void {
+  const applied = database
+    .prepare('SELECT 1 FROM schema_migrations WHERE version = ?')
+    .get(version);
+
+  if (applied) {
+    return;
+  }
+
+  database.exec('BEGIN IMMEDIATE');
+
+  try {
+    database.exec(statements);
+    database
+      .prepare('INSERT INTO schema_migrations (version) VALUES (?)')
+      .run(version);
+    database.exec('COMMIT');
+  } catch (error) {
+    database.exec('ROLLBACK');
+    throw error;
+  }
 }

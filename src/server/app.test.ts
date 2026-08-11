@@ -18,7 +18,9 @@ describe('GET /api/health', () => {
   });
 
   it('returns a successful JSON response when SQLite is available', async () => {
-    const response = await request(createApp({ database })).get('/api/health');
+    const response = await request(
+      createApp({ database, uploadsDirectory: 'unused-test-uploads' }),
+    ).get('/api/health');
 
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/json/);

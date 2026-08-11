@@ -1,27 +1,23 @@
 # Decisions
 
-This log contains only choices made while building the initial development and test harness. It does not claim any human override or disagreement that did not happen.
+This log contains only choices that were actually made while building the application. It is kept incrementally and does not invent disagreement or AI overrides after the fact.
 
-## Keep one npm package with source separated by runtime
+## TypeScript full stack in one npm package
 
-Codex selected a single package with `src/client`, `src/server`, and a reserved `src/shared` directory. Separate packages or a workspace would add dependency and script coordination without helping this scaffold. The accepted cost is that frontend and backend dependencies share one manifest; the source and TypeScript configurations still keep their runtime boundaries explicit.
+The initial AI analysis recommended TypeScript throughout, with React and Vite for the frontend and Express for the backend. I accepted that direction because one language across both runtimes and Vite's short feedback loop fit a time-boxed assessment. Codex kept the client and server in one npm package and used Vite's `/api` proxy instead of introducing a workspace or custom launcher. The cost is a shared dependency manifest, while separate source trees and TypeScript configurations must continue to enforce the runtime boundary.
 
-## Use Node's built-in SQLite module
+## SQLite instead of JSON files for durable state
 
-The handoff states that Node 24 is available, so the scaffold uses `node:sqlite` instead of adding a native SQLite package. This gives the backend a real local database and an in-memory test database with no native compilation step. The trade-off is an explicit Node 24 minimum rather than compatibility with older LTS releases.
+The assessment permits JSON files, but the AI handoff recommended SQLite and I accepted it because later milestones require atomic duplicate-execution claims, user isolation, conditional writes, and durable recovery. Implementing those guarantees on JSON would mean designing custom locking and concurrent-write behavior. We use Node's built-in `node:sqlite` module to avoid a native dependency. The accepted cost is requiring Node 24 or newer and maintaining explicit schema migrations.
 
-## Test the Express app through HTTP with injected storage
+## Opaque database sessions instead of JWT
 
-The Express application is created by a small factory that receives a database connection. The health test can therefore exercise the real route with Supertest and an in-memory SQLite instance, without binding a port or touching runtime files. This small injection seam is kept because it makes the first backend test deterministic and will support later service tests; no wider repository abstraction is introduced yet.
+Codex proposed a random opaque session token in an HTTP-only cookie rather than trusting an email header or adding JWT signing-key management. I accepted the approach and required the implementation details to be explicit: only a SHA-256 token hash is stored in SQLite, sessions expire after seven days, and the cookie is `Secure` in production while remaining usable over local HTTP in development. `SameSite=Lax`, same-origin APIs, and no cross-origin CORS cover the current CSRF boundary, so an additional CSRF-token system would add complexity without a matching risk in this local application. The cost is one database lookup per authenticated request and server-side session cleanup over time.
 
-## Use Vite's development proxy and one process supervisor
+## File first, visible project second
 
-`npm run dev` starts Vite and Express together with `concurrently`, while Vite proxies `/api` to the backend. This keeps browser requests same-origin in development and satisfies the one-command requirement. It adds one development-only dependency, but avoids a custom launcher and premature deployment configuration.
-
-## Keep this milestone free of Gemini substitutes
-
-The current task explicitly excludes Gemini integration and a mock Gemini provider. The scaffold therefore stops at health/readiness behavior instead of inventing interfaces for an API flow that is not being implemented or tested yet. Provider boundaries will be decided when the pipeline milestone begins and can be informed by real call mechanics.
+Codex initially proposed a single multipart project endpoint with in-memory upload validation, but left the ordering between the filesystem write and SQLite insert undefined. I pushed back because inserting the row first could expose a project whose book file failed to write. We now validate exactly one source, decode uploaded `.txt` data as non-empty UTF-8, write a temporary file and atomically rename it, then insert the project row; a failed insert triggers best-effort file cleanup. This favors database integrity. The remaining crash window can leave an invisible orphan file, but never a visible project that points to missing text.
 
 ## Next update
 
-Add entries only when a real implementation choice or genuine AI override occurs. Before final submission, answer the assessment's “one more day” question based on the state of the completed application rather than predicting it during scaffolding.
+As stronger pipeline decisions arise, keep this file focused on roughly 4–6 meaningful choices. Add AI overrides only when the recorded interaction actually happened, and answer the assessment's “one more day” question when the application is complete.

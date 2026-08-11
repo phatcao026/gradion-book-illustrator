@@ -1,6 +1,6 @@
 # Gradion Book Illustrator
 
-Minimal development and test harness for Gradion's book-illustration take-home assessment. This milestone proves that the React frontend, Express backend, local SQLite database, and Vitest test harness work together. It intentionally does not implement identity, projects, uploads, the illustration pipeline, or Gemini.
+Local full-stack application for Gradion's book-illustration take-home assessment. The current milestone implements name/email identity, server-side sessions, user-isolated project persistence, pasted text and `.txt` uploads, and the initial project screens. The five-step Gemini illustration pipeline is intentionally not implemented yet.
 
 ## Prerequisites
 
@@ -15,6 +15,14 @@ cp .env.example .env
 ```
 
 Copying `.env` is optional for the current defaults. On PowerShell, use `Copy-Item .env.example .env`.
+
+Current environment variables:
+
+- `PORT`: Express port; defaults to `3000`.
+- `DATABASE_PATH`: local SQLite file; defaults to `./data/gradion.sqlite`.
+- `UPLOADS_DIRECTORY`: local book/image root; defaults to `./uploads`.
+
+Session cookies are marked `Secure` automatically when `NODE_ENV=production`; local HTTP development keeps that flag disabled.
 
 ## Commands
 
@@ -33,12 +41,12 @@ During development, open `http://localhost:5173`. The backend listens on `http:/
 
 ## Current architecture
 
-- `src/client`: React placeholder application and its render test.
-- `src/server`: Express application, SQLite bootstrap, runtime entry point, and HTTP integration test.
-- `src/shared`: reserved for contracts that are genuinely shared by both sides; it is intentionally empty in this milestone.
-- `data`: local SQLite runtime data (created automatically and ignored by Git).
-- `uploads`: future local book/image storage (ignored by Git).
+- `src/client`: React Router screens for identity, project list, project creation, and project detail.
+- `src/server`: Express API, SHA-256 hashed cookie sessions, SQLite repositories/migrations, and atomic local book storage.
+- `src/shared`: Zod validation and DTO contracts shared by the browser and server.
+- `data`: local SQLite runtime data, created automatically and ignored by Git.
+- `uploads`: user/project-isolated book text, created automatically and ignored by Git.
 
-The project uses one npm package and one `npm run dev` process supervisor to keep the initial setup small. Docker is not needed for this local-only stack.
+The project uses one npm package and one `npm run dev` process supervisor to keep setup small. SQLite and local filesystem storage require no external service, so Docker would add setup overhead without solving a current dependency.
 
 See [TESTING.md](TESTING.md), [DECISIONS.md](DECISIONS.md), and [docs/pipeline.md](docs/pipeline.md) for the test boundary, decisions, and future milestones.

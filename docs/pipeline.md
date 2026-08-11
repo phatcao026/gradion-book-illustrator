@@ -16,7 +16,7 @@ Exit condition: the placeholder loads, the health endpoint returns JSON success,
 
 Decision checkpoint: record the source layout, SQLite storage choice, test harness, and development orchestration decisions that were genuinely made in this milestone.
 
-## Milestone 1 — Identity and project persistence
+## Milestone 1 — Identity and project persistence (completed)
 
 Backend and storage:
 
