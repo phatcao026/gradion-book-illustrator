@@ -282,6 +282,45 @@ export function createApp({
     },
   );
 
+  app.get(
+    '/api/projects/:projectId/chapters/:chapterId/illustration',
+    requireSession(repository),
+    async (request, response, next) => {
+      try {
+        const user = response.locals.user as SessionUser;
+        const projectId = request.params.projectId;
+        const chapterId = request.params.chapterId;
+        if (typeof projectId !== 'string' || typeof chapterId !== 'string') {
+          throw new ApiError(
+            404,
+            'ILLUSTRATION_NOT_FOUND',
+            'Illustration was not found.',
+          );
+        }
+
+        const illustration = executionRepository.getChapterIllustration(
+          user.id,
+          projectId,
+          chapterId,
+        );
+        if (!illustration) {
+          throw new ApiError(
+            404,
+            'ILLUSTRATION_NOT_FOUND',
+            'Illustration was not found.',
+          );
+        }
+
+        const bytes = await imageStorage.readImage(illustration.imagePath);
+        response.setHeader('Content-Type', illustration.mimeType);
+        response.setHeader('Cache-Control', 'private, max-age=3600');
+        response.status(200).send(bytes);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   app.post(
     '/api/projects/:projectId/pipeline/steps/:step/start',
     requireSession(repository),
@@ -351,6 +390,27 @@ export function createApp({
             throw new PipelineStateError(
               'STATE_CHANGED',
               'The Portraits request could not be prepared.',
+            );
+          }
+
+          if (
+            step === 5 &&
+            !executionRepository.prepareIllustrationAttempt({
+              userId: user.id,
+              projectId,
+              attemptId,
+              imageModel: geminiImageGateway.model,
+              now: new Date().toISOString(),
+            })
+          ) {
+            pipelineState.failAttempt(user.id, projectId, attemptId, {
+              code: 'PIPELINE_PREPARATION_FAILED',
+              message:
+                'The Illustrations request could not be saved before execution.',
+            });
+            throw new PipelineStateError(
+              'STATE_CHANGED',
+              'The Illustrations request could not be prepared.',
             );
           }
 
@@ -464,16 +524,18 @@ export function createApp({
 
 function parseAvailableStep(
   value: string | string[] | undefined,
-): Extract<PipelineStepNumber, 1 | 2 | 3> {
+): PipelineStepNumber {
   if (Array.isArray(value)) {
     throw new ApiError(409, 'STEP_NOT_AVAILABLE', 'Invalid pipeline step.');
   }
   const step = Number(value);
-  if (step === 1 || step === 2 || step === 3) return step;
+  if (Number.isInteger(step) && step >= 1 && step <= 5) {
+    return step as PipelineStepNumber;
+  }
   throw new ApiError(
     409,
     'STEP_NOT_AVAILABLE',
-    'Only Style, Characters, and Portraits are available through Milestone 4.',
+    'Only pipeline steps 1 through 5 are available.',
   );
 }
 

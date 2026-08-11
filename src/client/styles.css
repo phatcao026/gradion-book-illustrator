@@ -660,6 +660,32 @@ textarea:focus {
   gap: 18px;
 }
 
+.chapter-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.chapter-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #faf8f5;
+}
+
+.chapter-copy {
+  padding: 20px;
+}
+
+.chapter-copy h3 {
+  margin: 0 0 8px;
+}
+
+.chapter-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
 .character-card {
   padding: 20px;
   border: 1px solid var(--line);
@@ -677,7 +703,8 @@ textarea:focus {
   line-height: 1.65;
 }
 
-.portrait-placeholder {
+.portrait-placeholder,
+.illustration-placeholder {
   min-height: 150px;
   display: grid;
   place-items: center;
@@ -691,17 +718,20 @@ textarea:focus {
   letter-spacing: 0.05em;
 }
 
-.portrait-placeholder.generating {
+.portrait-placeholder.generating,
+.illustration-placeholder.generating {
   border-color: var(--grad-orange);
   color: var(--grad-ink);
   background: #fff8df;
 }
 
-.portrait-placeholder.queued {
+.portrait-placeholder.queued,
+.illustration-placeholder.queued {
   background: #f4f2ee;
 }
 
-.portrait-placeholder.failed {
+.portrait-placeholder.failed,
+.illustration-placeholder.failed {
   gap: 8px;
   padding: 18px;
   color: #8b2f24;
@@ -709,7 +739,8 @@ textarea:focus {
   text-align: center;
 }
 
-.portrait-placeholder.failed small {
+.portrait-placeholder.failed small,
+.illustration-placeholder.failed small {
   font-size: 0.72rem;
   font-weight: 500;
   line-height: 1.4;
@@ -722,6 +753,18 @@ textarea:focus {
   aspect-ratio: 9 / 16;
   display: block;
   border-radius: 10px;
+  object-fit: cover;
+  background: #f4f2ee;
+}
+
+.illustration-placeholder,
+.illustration-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.illustration-image {
+  display: block;
   object-fit: cover;
   background: #f4f2ee;
 }

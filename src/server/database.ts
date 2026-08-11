@@ -136,6 +136,37 @@ export function openDatabase(databasePath: string): AppDatabase {
     CREATE INDEX character_portraits_status_idx ON character_portraits(status);
   `);
 
+  applyMigration(database, 6, `
+    ALTER TABLE project_ai_contexts ADD COLUMN chapters_interaction_id TEXT;
+
+    CREATE TABLE chapters (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE chapter_illustrations (
+      chapter_id TEXT PRIMARY KEY REFERENCES chapters(id) ON DELETE CASCADE,
+      status TEXT NOT NULL
+        CHECK (status IN ('QUEUED', 'GENERATING', 'COMPLETED', 'FAILED')),
+      image_path TEXT UNIQUE,
+      mime_type TEXT CHECK (mime_type IN ('image/png', 'image/jpeg')),
+      interaction_id TEXT,
+      error_code TEXT,
+      error_message TEXT,
+      updated_at TEXT NOT NULL,
+      CHECK (
+        status <> 'COMPLETED'
+        OR (image_path IS NOT NULL AND mime_type IS NOT NULL AND interaction_id IS NOT NULL)
+      )
+    );
+
+    CREATE INDEX chapter_illustrations_status_idx
+      ON chapter_illustrations(status);
+  `);
+
   return database;
 }
 

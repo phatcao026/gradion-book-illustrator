@@ -319,6 +319,10 @@ class FakeGeminiGateway implements GeminiGateway {
     styleInput: string;
   }> = [];
   readonly characterCalls: string[] = [];
+  readonly chapterCalls: Array<{
+    previousInteractionId: string;
+    characters: Array<{ name: string; prompt: string }>;
+  }> = [];
   readonly styleResults: Array<GeminiInteractionOutput | Error> = [];
   readonly characterResults: Array<GeminiInteractionOutput | Error> = [];
 
@@ -356,6 +360,23 @@ class FakeGeminiGateway implements GeminiGateway {
       id: `characters-${this.characterCalls.length}`,
       text: '[]',
     });
+  }
+
+  async createChaptersInteraction(
+    previousInteractionId: string,
+    characters: Array<{ name: string; prompt: string }>,
+  ): Promise<GeminiInteractionOutput> {
+    this.chapterCalls.push({ previousInteractionId, characters });
+    return {
+      id: `chapters-${this.chapterCalls.length}`,
+      text: JSON.stringify([
+        {
+          name: 'Opening Scene',
+          prompt:
+            'A detailed single chapter scene grounded in the saved book and established adult characters.',
+        },
+      ]),
+    };
   }
 }
 

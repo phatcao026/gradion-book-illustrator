@@ -66,6 +66,38 @@ Expired-chain rebuild instruction:
 Use the supplied completed portraits as visual references for a consistent cast and art direction.
 ```
 
+## Chapter Prompt
+
+Sent from the persisted Characters interaction while it remains available. After text-context expiry it is sent from the rebuilt Style interaction with the same persisted character list, without regenerating Characters.
+
+```text
+Create exactly one chapter illustration prompt for the book.
+Choose a representative scene that works as one full-bleed image, not a multi-panel or tiled page.
+Return a concise scene name and a highly descriptive image-generation prompt grounded in the book.
+Name every persisted adult character who appears and reuse their established visual description accurately.
+Persisted adult characters:
+{persistedCharacterNamesAndPromptsOrEmptyNotice}
+Do not return image data or more than one chapter.
+```
+
+The structured response is a strict array containing exactly one `{ name, prompt }` item. Gemini schema and server validation independently enforce the one-Chapter cap.
+
+## Chapter Illustration
+
+This combines the notebook's image-conversation transition and actual chapter-image request into one paid image call:
+
+```text
+Transition from character portraits to one 16:9 chapter scene illustration.
+Scene name: {chapterName}
+Scene description: {chapterPrompt}
+Art direction: {style}
+{portraitReferenceInstruction}
+Characters may change pose, expression, scale, and position to fit the scene, but their identity, clothing, and defining features must remain consistent.
+Produce one cinematic, full-bleed, family-friendly illustration with uplifting colors, no panels, borders, cover layout, title, caption, typography, or written text.
+```
+
+The normal path chains directly from the final portrait interaction. If that context expired, all completed local portraits—at most two—are attached as references. A book with no adult characters sends no image references.
+
 ## Execution settings
 
 - Default text model: `gemini-3.6-flash`, configurable with `GEMINI_TEXT_MODEL`.
@@ -73,6 +105,7 @@ Use the supplied completed portraits as visual references for a consistent cast 
 - Service tier: `standard` only.
 - Interactions are stored and chained using `previous_interaction_id`.
 - Portrait output requests PNG, `9:16`, and `1K`; PNG and JPEG responses are accepted only after byte-level validation.
+- Chapter Illustration output requests PNG, `16:9`, and `1K` through the same validation and storage boundary.
 - Search/grounding tools are not enabled for portrait generation.
 - The first actual portrait establishes image context; there is no separate paid seed-image call. Later portraits chain from the preceding portrait interaction.
 - When the image interaction expires, completed local portraits are supplied as references and only missing portraits are generated.

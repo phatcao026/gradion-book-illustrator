@@ -1,6 +1,6 @@
 # Gradion Book Illustrator
 
-Local full-stack application for Gradion's book-illustration take-home assessment. The current milestone implements identity, user-isolated project persistence, durable pipeline recovery, and the Gemini-backed Style, adult-Character, and Portrait steps. Chapter and final-illustration generation remain intentionally unavailable.
+Local full-stack application for Gradion's book-illustration take-home assessment. The complete five-step pipeline is implemented: Style, adult Characters, Portraits, one Chapter prompt, and one final Illustration. Real paid-key image verification remains a separate final acceptance step.
 
 ## Prerequisites
 
@@ -46,15 +46,15 @@ During development, open `http://localhost:5173`. The backend listens on `http:/
 
 ## Current architecture
 
-- `src/client`: React Router screens, 1.5-second polling while a step runs, Style/Character results, per-character Portrait progress, and persisted running/error/recovery views.
+- `src/client`: React Router screens, 1.5-second polling while a step runs, every persisted result, per-image progress, and running/error/recovery views.
 - `src/server`: Express API, SHA-256 hashed cookie sessions, SQLite migrations, atomic local book/image storage, conditional pipeline writes, and official Gemini SDK text/image gateways.
 - `src/shared`: validation and DTO contracts shared by the browser and server.
-- `docs/ai/prompts.md`: the Gemini prompts and execution settings actually used through M4.
+- `docs/ai/prompts.md`: the Gemini prompts and execution settings actually used across all five steps.
 - `data`: local SQLite runtime data, created automatically and ignored by Git.
 - `uploads`: user/project-isolated book text, created automatically and ignored by Git.
 
 The project uses one npm package and one `npm run dev` process supervisor to keep setup small. SQLite and local filesystem storage require no external service, so Docker would add setup overhead without solving a current dependency.
 
-M3–M4 use stored Gemini Interactions and persist each reusable identifier or validated output before the next external call. Portraits are generated sequentially, written to local storage immediately, and retries skip completed characters. The SDK is configured with zero automatic retries; only the Generate/Retry buttons can issue a new attempt. Automated tests use fakes only at the gateway boundaries and do not claim that a real API call passed.
+The pipeline uses stored Gemini Interactions and persists each reusable identifier or validated output before the next external call. Portraits are generated sequentially; the Chapter prompt resumes the text chain from Characters; and the final 16:9 Illustration resumes the portrait chain or rebuilds from completed local portraits. Images are written immediately and retries skip completed work. The SDK is configured with zero automatic retries; only Generate/Retry buttons can issue a new attempt. Automated tests use fakes only at gateway boundaries and do not claim that a real API call passed.
 
 See [TESTING.md](TESTING.md), [DECISIONS.md](DECISIONS.md), and [docs/pipeline.md](docs/pipeline.md) for the test boundary, decisions, and future milestones.

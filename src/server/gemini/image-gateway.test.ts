@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { GEMINI_AUTOMATIC_RETRIES } from './gemini-gateway.js';
 import { GoogleGeminiImageGateway } from './image-gateway.js';
-import { portraitPrompt } from './prompts.js';
+import { chapterIllustrationPrompt, portraitPrompt } from './prompts.js';
 
 const pngBytes = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -126,6 +126,45 @@ describe('GoogleGeminiImageGateway', () => {
       }),
     ).rejects.toMatchObject({ code: 'GEMINI_CONTEXT_EXPIRED' });
     expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('generates one 16:9 Chapter illustration directly from portrait context', async () => {
+    const create = vi.fn().mockResolvedValue({
+      id: 'illustration-1',
+      output_image: { data: pngBytes.toString('base64'), mime_type: 'image/png' },
+    });
+    const gateway = createGateway(create);
+
+    await gateway.generateChapterIllustration({
+      previousInteractionId: 'portrait-2',
+      references: [],
+      chapterName: 'River Reunion',
+      chapterPrompt: 'Mara and Theo meet beside the river at sunset.',
+      style: 'Layered watercolor.',
+    });
+
+    expect(create).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledWith(
+      {
+        model: 'gemini-image-test',
+        input: chapterIllustrationPrompt({
+          chapterName: 'River Reunion',
+          chapterPrompt: 'Mara and Theo meet beside the river at sunset.',
+          style: 'Layered watercolor.',
+          hasReferencePortraits: false,
+        }),
+        previous_interaction_id: 'portrait-2',
+        response_format: {
+          type: 'image',
+          mime_type: 'image/png',
+          aspect_ratio: '16:9',
+          image_size: '1K',
+        },
+        service_tier: 'standard',
+        store: true,
+      },
+      { maxRetries: GEMINI_AUTOMATIC_RETRIES, timeout: 180_000 },
+    );
   });
 });
 

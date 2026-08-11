@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  ChapterResult,
   CharacterResult,
+  IllustrationStatus,
   PortraitStatus,
   StyleResult,
   StyleSource,
@@ -27,6 +29,7 @@ export interface PipelineExecutionContext {
   bookInteractionId: string | null;
   styleInteractionId: string | null;
   charactersInteractionId: string | null;
+  chaptersInteractionId: string | null;
   styleSource: StyleSource | null;
   styleInput: string;
   styleText: string | null;
@@ -51,6 +54,7 @@ interface ExecutionRow {
   book_interaction_id: string | null;
   style_interaction_id: string | null;
   characters_interaction_id: string | null;
+  chapters_interaction_id: string | null;
   style_source: StyleSource | null;
   style_input: string | null;
   style_text: string | null;
@@ -70,11 +74,33 @@ interface CharacterRow {
   error_message: string | null;
 }
 
+interface ChapterRow {
+  id: string;
+  name: string;
+  prompt: string;
+  illustration_status: IllustrationStatus | null;
+  image_path: string | null;
+  mime_type: StoredImageMimeType | null;
+  interaction_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+}
+
 export interface PortraitWorkItem {
   characterId: string;
   name: string;
   prompt: string;
   status: PortraitStatus;
+  imagePath: string | null;
+  mimeType: StoredImageMimeType | null;
+  interactionId: string | null;
+}
+
+export interface IllustrationWorkItem {
+  chapterId: string;
+  name: string;
+  prompt: string;
+  status: IllustrationStatus;
   imagePath: string | null;
   mimeType: StoredImageMimeType | null;
   interactionId: string | null;
@@ -184,6 +210,69 @@ export class PipelineExecutionRepository {
     });
   }
 
+  prepareIllustrationAttempt(input: {
+    userId: string;
+    projectId: string;
+    attemptId: string;
+    imageModel: string;
+    now: string;
+  }): boolean {
+    return this.inTransaction(() => {
+      const attempt: AttemptInput = { ...input, step: 5 };
+      if (!this.ownsAttempt(attempt)) return false;
+
+      const context = this.database
+        .prepare(
+          'SELECT image_model FROM project_ai_contexts WHERE project_id = ?',
+        )
+        .get(input.projectId) as unknown as { image_model: string | null } | undefined;
+      const chapter = this.database
+        .prepare('SELECT id FROM chapters WHERE project_id = ?')
+        .get(input.projectId) as unknown as { id: string } | undefined;
+      if (!context || !chapter) return false;
+
+      this.database
+        .prepare(`
+          UPDATE project_ai_contexts
+          SET image_model = ?,
+              image_context_state = CASE
+                WHEN image_model IS NOT NULL AND image_model <> ?
+                  THEN 'EXPIRED'
+                ELSE image_context_state
+              END,
+              updated_at = ?
+          WHERE project_id = ?
+        `)
+        .run(input.imageModel, input.imageModel, input.now, input.projectId);
+
+      this.database
+        .prepare(`
+          INSERT INTO chapter_illustrations (
+            chapter_id, status, updated_at
+          ) VALUES (?, 'QUEUED', ?)
+          ON CONFLICT (chapter_id) DO UPDATE SET
+            status = CASE
+              WHEN chapter_illustrations.status = 'COMPLETED'
+                THEN 'COMPLETED'
+              ELSE 'QUEUED'
+            END,
+            error_code = CASE
+              WHEN chapter_illustrations.status = 'COMPLETED'
+                THEN chapter_illustrations.error_code
+              ELSE NULL
+            END,
+            error_message = CASE
+              WHEN chapter_illustrations.status = 'COMPLETED'
+                THEN chapter_illustrations.error_message
+              ELSE NULL
+            END,
+            updated_at = excluded.updated_at
+        `)
+        .run(chapter.id, input.now);
+      return true;
+    });
+  }
+
   getContext(userId: string, projectId: string): PipelineExecutionContext | null {
     const row = this.database
       .prepare(`
@@ -194,7 +283,8 @@ export class PipelineExecutionRepository {
                context.gemini_file_name, context.gemini_file_uri,
                context.gemini_file_expires_at, context.book_interaction_id,
                context.style_interaction_id,
-               context.characters_interaction_id, context.style_source,
+               context.characters_interaction_id,
+               context.chapters_interaction_id, context.style_source,
                context.style_input, context.style_text,
                context.image_model, context.image_context_state
         FROM projects
@@ -211,10 +301,11 @@ export class PipelineExecutionRepository {
     styleInput: string;
     style: StyleResult | null;
     characters: CharacterResult[];
+    chapters: ChapterResult[];
   } {
     const context = this.getContext(userId, projectId);
     if (!context) {
-      return { styleInput: '', style: null, characters: [] };
+      return { styleInput: '', style: null, characters: [], chapters: [] };
     }
 
     const rows = this.database
@@ -231,6 +322,21 @@ export class PipelineExecutionRepository {
         ORDER BY characters.ordinal ASC
       `)
       .all(projectId, userId) as unknown as CharacterRow[];
+
+    const chapterRows = this.database
+      .prepare(`
+        SELECT chapters.id, chapters.name, chapters.prompt,
+               illustrations.status AS illustration_status,
+               illustrations.image_path, illustrations.mime_type,
+               illustrations.interaction_id, illustrations.error_code,
+               illustrations.error_message
+        FROM chapters
+        JOIN projects ON projects.id = chapters.project_id
+        LEFT JOIN chapter_illustrations AS illustrations
+          ON illustrations.chapter_id = chapters.id
+        WHERE chapters.project_id = ? AND projects.user_id = ?
+      `)
+      .all(projectId, userId) as unknown as ChapterRow[];
 
     return {
       styleInput: context.styleInput,
@@ -257,7 +363,237 @@ export class PipelineExecutionRepository {
             }
           : null,
       })),
+      chapters: chapterRows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        prompt: row.prompt,
+        illustration: row.illustration_status
+          ? {
+              status: row.illustration_status,
+              imageUrl:
+                row.illustration_status === 'COMPLETED'
+                  ? `/api/projects/${encodeURIComponent(projectId)}/chapters/${encodeURIComponent(row.id)}/illustration`
+                  : null,
+              mimeType: row.mime_type,
+              error:
+                row.error_code && row.error_message
+                  ? { code: row.error_code, message: row.error_message }
+                  : null,
+            }
+          : null,
+      })),
     };
+  }
+
+  listCharacterPrompts(
+    userId: string,
+    projectId: string,
+  ): Array<{ name: string; prompt: string }> {
+    return this.database
+      .prepare(`
+        SELECT characters.name, characters.prompt
+        FROM characters
+        JOIN projects ON projects.id = characters.project_id
+        WHERE characters.project_id = ? AND projects.user_id = ?
+        ORDER BY characters.ordinal
+      `)
+      .all(projectId, userId) as unknown as Array<{
+      name: string;
+      prompt: string;
+    }>;
+  }
+
+  completeChapters(input: AttemptInput & {
+    interactionId: string;
+    chapter: { name: string; prompt: string };
+  }): boolean {
+    return this.inTransaction(() => {
+      if (!this.ownsAttempt(input)) return false;
+
+      this.database
+        .prepare('DELETE FROM chapters WHERE project_id = ?')
+        .run(input.projectId);
+      this.database
+        .prepare(`
+          INSERT INTO chapters (id, project_id, name, prompt, created_at)
+          VALUES (?, ?, ?, ?, ?)
+        `)
+        .run(
+          randomUUID(),
+          input.projectId,
+          input.chapter.name,
+          input.chapter.prompt,
+          input.now,
+        );
+      this.database
+        .prepare(`
+          UPDATE project_ai_contexts
+          SET chapters_interaction_id = ?, context_state = 'READY',
+              updated_at = ?
+          WHERE project_id = ?
+        `)
+        .run(input.interactionId, input.now, input.projectId);
+
+      return this.completeProjectAttempt(input);
+    });
+  }
+
+  getIllustrationWork(
+    userId: string,
+    projectId: string,
+  ): IllustrationWorkItem | null {
+    const row = this.database
+      .prepare(`
+        SELECT chapters.id, chapters.name, chapters.prompt,
+               illustrations.status AS illustration_status,
+               illustrations.image_path, illustrations.mime_type,
+               illustrations.interaction_id, illustrations.error_code,
+               illustrations.error_message
+        FROM chapters
+        JOIN projects ON projects.id = chapters.project_id
+        JOIN chapter_illustrations AS illustrations
+          ON illustrations.chapter_id = chapters.id
+        WHERE chapters.project_id = ? AND projects.user_id = ?
+      `)
+      .get(projectId, userId) as unknown as ChapterRow | undefined;
+    return row
+      ? {
+          chapterId: row.id,
+          name: row.name,
+          prompt: row.prompt,
+          status: requiredIllustrationStatus(row.illustration_status),
+          imagePath: row.image_path,
+          mimeType: row.mime_type,
+          interactionId: row.interaction_id,
+        }
+      : null;
+  }
+
+  markIllustrationGenerating(
+    input: AttemptInput & { chapterId: string },
+  ): boolean {
+    return this.updateForAttempt(
+      `
+        UPDATE chapter_illustrations
+        SET status = 'GENERATING', error_code = NULL, error_message = NULL,
+            updated_at = ?
+        WHERE chapter_id = ? AND status <> 'COMPLETED' AND EXISTS (
+          SELECT 1 FROM chapters
+          JOIN projects ON projects.id = chapters.project_id
+          WHERE chapters.id = chapter_illustrations.chapter_id
+            AND projects.id = ? AND projects.user_id = ?
+            AND projects.run_state = 'RUNNING'
+            AND projects.active_step = ? AND projects.attempt_id = ?
+        )
+      `,
+      [
+        input.now,
+        input.chapterId,
+        input.projectId,
+        input.userId,
+        input.step,
+        input.attemptId,
+      ],
+    );
+  }
+
+  completeIllustration(input: AttemptInput & {
+    chapterId: string;
+    imagePath: string;
+    mimeType: StoredImageMimeType;
+    interactionId: string;
+  }): boolean {
+    return this.inTransaction(() => {
+      const applied = this.updateForAttempt(
+        `
+          UPDATE chapter_illustrations
+          SET status = 'COMPLETED', image_path = ?, mime_type = ?,
+              interaction_id = ?, error_code = NULL, error_message = NULL,
+              updated_at = ?
+          WHERE chapter_id = ? AND status = 'GENERATING' AND EXISTS (
+            SELECT 1 FROM chapters
+            JOIN projects ON projects.id = chapters.project_id
+            WHERE chapters.id = chapter_illustrations.chapter_id
+              AND projects.id = ? AND projects.user_id = ?
+              AND projects.run_state = 'RUNNING'
+              AND projects.active_step = ? AND projects.attempt_id = ?
+          )
+        `,
+        [
+          input.imagePath,
+          input.mimeType,
+          input.interactionId,
+          input.now,
+          input.chapterId,
+          input.projectId,
+          input.userId,
+          input.step,
+          input.attemptId,
+        ],
+      );
+      if (!applied) return false;
+
+      this.database
+        .prepare(`
+          UPDATE project_ai_contexts
+          SET image_context_state = 'READY', updated_at = ?
+          WHERE project_id = ?
+        `)
+        .run(input.now, input.projectId);
+      return true;
+    });
+  }
+
+  failIllustration(input: AttemptInput & {
+    chapterId: string;
+    error: { code: string; message: string };
+  }): boolean {
+    return this.updateForAttempt(
+      `
+        UPDATE chapter_illustrations
+        SET status = 'FAILED', error_code = ?, error_message = ?, updated_at = ?
+        WHERE chapter_id = ? AND status <> 'COMPLETED' AND EXISTS (
+          SELECT 1 FROM chapters
+          JOIN projects ON projects.id = chapters.project_id
+          WHERE chapters.id = chapter_illustrations.chapter_id
+            AND projects.id = ? AND projects.user_id = ?
+            AND projects.run_state = 'RUNNING'
+            AND projects.active_step = ? AND projects.attempt_id = ?
+        )
+      `,
+      [
+        input.error.code,
+        input.error.message,
+        input.now,
+        input.chapterId,
+        input.projectId,
+        input.userId,
+        input.step,
+        input.attemptId,
+      ],
+    );
+  }
+
+  getChapterIllustration(
+    userId: string,
+    projectId: string,
+    chapterId: string,
+  ): { imagePath: string; mimeType: StoredImageMimeType } | null {
+    const row = this.database
+      .prepare(`
+        SELECT illustrations.image_path, illustrations.mime_type
+        FROM chapter_illustrations AS illustrations
+        JOIN chapters ON chapters.id = illustrations.chapter_id
+        JOIN projects ON projects.id = chapters.project_id
+        WHERE projects.id = ? AND projects.user_id = ?
+          AND chapters.id = ? AND illustrations.status = 'COMPLETED'
+      `)
+      .get(projectId, userId, chapterId) as unknown as
+      | { image_path: string; mime_type: StoredImageMimeType }
+      | undefined;
+    return row
+      ? { imagePath: row.image_path, mimeType: row.mime_type }
+      : null;
   }
 
   listPortraitWork(userId: string, projectId: string): PortraitWorkItem[] {
@@ -472,7 +808,8 @@ export class PipelineExecutionRepository {
         SET context_state = 'READY', gemini_file_name = NULL,
             gemini_file_uri = NULL, gemini_file_expires_at = NULL,
             book_interaction_id = NULL, style_interaction_id = NULL,
-            characters_interaction_id = NULL, updated_at = ?
+            characters_interaction_id = NULL, chapters_interaction_id = NULL,
+            updated_at = ?
         WHERE project_id = ? AND context_state = 'EXPIRED' AND EXISTS (
           SELECT 1 FROM projects
           WHERE id = project_ai_contexts.project_id AND user_id = ?
@@ -635,7 +972,7 @@ export class PipelineExecutionRepository {
 interface AttemptInput {
   userId: string;
   projectId: string;
-  step: 1 | 2 | 3;
+  step: 1 | 2 | 3 | 4 | 5;
   attemptId: string;
   now: string;
 }
@@ -660,6 +997,7 @@ function mapExecutionRow(row: ExecutionRow): PipelineExecutionContext {
     bookInteractionId: row.book_interaction_id,
     styleInteractionId: row.style_interaction_id,
     charactersInteractionId: row.characters_interaction_id,
+    chaptersInteractionId: row.chapters_interaction_id,
     styleSource: row.style_source,
     styleInput: row.style_input ?? '',
     styleText: row.style_text,
@@ -670,5 +1008,12 @@ function mapExecutionRow(row: ExecutionRow): PipelineExecutionContext {
 
 function requiredPortraitStatus(value: PortraitStatus | null): PortraitStatus {
   if (!value) throw new Error('Portrait work is missing its persisted status.');
+  return value;
+}
+
+function requiredIllustrationStatus(
+  value: IllustrationStatus | null,
+): IllustrationStatus {
+  if (!value) throw new Error('Illustration work is missing its persisted status.');
   return value;
 }

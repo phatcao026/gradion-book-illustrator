@@ -18,15 +18,50 @@ export class ImageStorage {
     mimeType: StoredImageMimeType;
     bytes: Buffer;
   }): Promise<string> {
+    return this.writeImage({
+      userId: input.userId,
+      projectId: input.projectId,
+      directoryName: 'portraits',
+      itemId: input.characterId,
+      mimeType: input.mimeType,
+      bytes: input.bytes,
+    });
+  }
+
+  async writeChapterIllustration(input: {
+    userId: string;
+    projectId: string;
+    chapterId: string;
+    mimeType: StoredImageMimeType;
+    bytes: Buffer;
+  }): Promise<string> {
+    return this.writeImage({
+      userId: input.userId,
+      projectId: input.projectId,
+      directoryName: 'chapters',
+      itemId: input.chapterId,
+      mimeType: input.mimeType,
+      bytes: input.bytes,
+    });
+  }
+
+  private async writeImage(input: {
+    userId: string;
+    projectId: string;
+    directoryName: 'portraits' | 'chapters';
+    itemId: string;
+    mimeType: StoredImageMimeType;
+    bytes: Buffer;
+  }): Promise<string> {
     const directory = join(
       this.root,
       input.userId,
       input.projectId,
-      'portraits',
+      input.directoryName,
     );
     const extension = input.mimeType === 'image/png' ? 'png' : 'jpg';
-    const finalPath = join(directory, `${input.characterId}.${extension}`);
-    const temporaryPath = join(directory, `${input.characterId}-${randomUUID()}.tmp`);
+    const finalPath = join(directory, `${input.itemId}.${extension}`);
+    const temporaryPath = join(directory, `${input.itemId}-${randomUUID()}.tmp`);
 
     await mkdir(directory, { recursive: true });
     try {

@@ -5,6 +5,7 @@ import {
   BOOK_CONTEXT_PROMPT,
   CHARACTERS_PROMPT,
   GENERATED_STYLE_PROMPT,
+  chaptersPrompt,
   userStylePrompt,
 } from './prompts.js';
 
@@ -32,6 +33,10 @@ export interface GeminiGateway {
   ): Promise<GeminiInteractionOutput>;
   createCharactersInteraction(
     previousInteractionId: string,
+  ): Promise<GeminiInteractionOutput>;
+  createChaptersInteraction(
+    previousInteractionId: string,
+    characters: Array<{ name: string; prompt: string }>,
   ): Promise<GeminiInteractionOutput>;
 }
 
@@ -166,6 +171,41 @@ export class GoogleGeminiGateway implements GeminiGateway {
     });
   }
 
+  async createChaptersInteraction(
+    previousInteractionId: string,
+    characters: Array<{ name: string; prompt: string }>,
+  ): Promise<GeminiInteractionOutput> {
+    return this.createInteraction({
+      input: chaptersPrompt(characters),
+      previous_interaction_id: previousInteractionId,
+      response_format: {
+        type: 'text',
+        mime_type: 'application/json',
+        schema: {
+          type: 'array',
+          minItems: 1,
+          maxItems: PIPELINE_LIMITS.maxChapters,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              name: {
+                type: 'string',
+                description: 'A concise name for the selected scene.',
+              },
+              prompt: {
+                type: 'string',
+                description:
+                  'A detailed single-image chapter scene prompt grounded in the book.',
+              },
+            },
+            required: ['name', 'prompt'],
+          },
+        },
+      },
+    });
+  }
+
   private async createInteraction(input: {
     input: Interactions.CreateModelInteractionParamsNonStreaming['input'];
     previous_interaction_id?: string;
@@ -227,6 +267,10 @@ export class UnconfiguredGeminiGateway implements GeminiGateway {
   }
 
   createCharactersInteraction(): Promise<GeminiInteractionOutput> {
+    return Promise.reject(notConfiguredError());
+  }
+
+  createChaptersInteraction(): Promise<GeminiInteractionOutput> {
     return Promise.reject(notConfiguredError());
   }
 }

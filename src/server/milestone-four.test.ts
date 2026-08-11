@@ -12,6 +12,7 @@ import { createApp } from './app.js';
 import { openDatabase, type AppDatabase } from './database.js';
 import { GeminiGatewayError } from './gemini/gemini-gateway.js';
 import type {
+  ChapterIllustrationGenerationInput,
   GeneratedGeminiImage,
   GeminiImageGateway,
   PortraitGenerationInput,
@@ -224,6 +225,7 @@ describe('Milestone 4 Portraits', () => {
 class FakeImageGateway implements GeminiImageGateway {
   readonly model = 'gemini-image-test';
   readonly calls: PortraitGenerationInput[] = [];
+  readonly illustrationCalls: ChapterIllustrationGenerationInput[] = [];
   readonly results: Array<
     GeneratedGeminiImage | Error | Promise<GeneratedGeminiImage>
   > = [];
@@ -233,6 +235,13 @@ class FakeImageGateway implements GeminiImageGateway {
     const result = this.results.shift() ?? image(`portrait-${this.calls.length}`);
     if (result instanceof Error) throw result;
     return result;
+  }
+
+  async generateChapterIllustration(
+    input: ChapterIllustrationGenerationInput,
+  ): Promise<GeneratedGeminiImage> {
+    this.illustrationCalls.push(input);
+    return image(`illustration-${this.illustrationCalls.length}`);
   }
 }
 

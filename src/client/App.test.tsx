@@ -8,7 +8,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Milestone 1 frontend', () => {
+describe('frontend flows', () => {
   it('shows the identity screen and validates its fields', async () => {
     stubFetch(() =>
       jsonResponse(
@@ -92,6 +92,7 @@ describe('Milestone 1 frontend', () => {
             styleInput: '',
             style: null,
             characters: [],
+            chapters: [],
           },
         });
       }
@@ -133,6 +134,7 @@ describe('Milestone 1 frontend', () => {
                 portrait: null,
               },
             ],
+            chapters: [],
           },
         });
       }
@@ -193,6 +195,7 @@ describe('Milestone 1 frontend', () => {
                 },
               },
             ],
+            chapters: [],
           },
         });
       }
@@ -208,6 +211,113 @@ describe('Milestone 1 frontend', () => {
     expect(screen.getByText('Portrait failed')).toBeInTheDocument();
     expect(screen.getByText('Image request failed.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry Portraits' })).toBeEnabled();
+  });
+
+  it('renders a failed chapter illustration and exposes only its explicit retry', async () => {
+    stubFetch((input) => {
+      const url = String(input);
+      if (url === '/api/session') return jsonResponse({ user: sessionUser });
+      if (url === '/api/projects/project-4') {
+        return jsonResponse({
+          project: {
+            id: 'project-4',
+            title: 'Chapter Story',
+            createdAt: '2026-08-11T00:00:00.000Z',
+            status: 'IN_PROGRESS',
+            pipeline: {
+              ...idlePipeline,
+              completedStep: 4,
+              activeStep: 5,
+              nextStep: 5,
+              runState: 'FAILED',
+              attemptId: 'illustration-attempt',
+              error: {
+                code: 'GEMINI_REQUEST_FAILED',
+                message: 'Chapter illustration stopped.',
+              },
+            },
+            bookText: 'A saved chapter story.',
+            styleInput: '',
+            style: { source: 'GENERATED', text: 'Layered watercolor.' },
+            characters: [],
+            chapters: [
+              {
+                id: 'chapter-1',
+                name: 'River Reunion',
+                prompt: 'A cinematic riverbank reunion at sunset.',
+                illustration: {
+                  status: 'FAILED',
+                  imageUrl: null,
+                  mimeType: null,
+                  error: {
+                    code: 'GEMINI_REQUEST_FAILED',
+                    message: 'Image request failed.',
+                  },
+                },
+              },
+            ],
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    renderApp('/projects/project-4');
+
+    expect(await screen.findByRole('heading', { name: 'River Reunion' })).toBeInTheDocument();
+    expect(screen.getByText('Illustration failed')).toBeInTheDocument();
+    expect(screen.getByText('Image request failed.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry Illustrations' })).toBeEnabled();
+  });
+
+  it('renders the completed final illustration and Done project state', async () => {
+    stubFetch((input) => {
+      const url = String(input);
+      if (url === '/api/session') return jsonResponse({ user: sessionUser });
+      if (url === '/api/projects/project-5') {
+        return jsonResponse({
+          project: {
+            id: 'project-5',
+            title: 'Finished Story',
+            createdAt: '2026-08-11T00:00:00.000Z',
+            status: 'DONE',
+            pipeline: {
+              ...idlePipeline,
+              completedStep: 5,
+              nextStep: null,
+            },
+            bookText: 'The complete book remains available.',
+            styleInput: '',
+            style: { source: 'GENERATED', text: 'Layered watercolor.' },
+            characters: [],
+            chapters: [
+              {
+                id: 'chapter-1',
+                name: 'River Reunion',
+                prompt: 'A cinematic riverbank reunion at sunset.',
+                illustration: {
+                  status: 'COMPLETED',
+                  imageUrl:
+                    '/api/projects/project-5/chapters/chapter-1/illustration',
+                  mimeType: 'image/png',
+                  error: null,
+                },
+              },
+            ],
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    renderApp('/projects/project-5');
+
+    expect(await screen.findByText('Done')).toBeInTheDocument();
+    expect(screen.getByAltText('Illustration for River Reunion')).toHaveAttribute(
+      'src',
+      '/api/projects/project-5/chapters/chapter-1/illustration',
+    );
+    expect(screen.getByText('The complete book remains available.')).toBeInTheDocument();
   });
 });
 

@@ -14,6 +14,7 @@ export type PipelineRunState = 'IDLE' | 'RUNNING' | 'FAILED' | 'INTERRUPTED';
 export type ProjectStatus = 'DRAFT' | 'IN_PROGRESS' | 'DONE';
 export type StyleSource = 'USER' | 'GENERATED';
 export type PortraitStatus = 'QUEUED' | 'GENERATING' | 'COMPLETED' | 'FAILED';
+export type IllustrationStatus = PortraitStatus;
 
 export interface PipelineError {
   code: string;
@@ -45,6 +46,20 @@ export interface CharacterResult {
 
 export interface PortraitResult {
   status: PortraitStatus;
+  imageUrl: string | null;
+  mimeType: 'image/png' | 'image/jpeg' | null;
+  error: PipelineError | null;
+}
+
+export interface ChapterResult {
+  id: string;
+  name: string;
+  prompt: string;
+  illustration: IllustrationResult | null;
+}
+
+export interface IllustrationResult {
+  status: IllustrationStatus;
   imageUrl: string | null;
   mimeType: 'image/png' | 'image/jpeg' | null;
   error: PipelineError | null;
@@ -96,4 +111,5 @@ export interface ProjectDetail extends ProjectSummary {
   style: StyleResult | null;
   styleInput: string;
   characters: CharacterResult[];
+  chapters: ChapterResult[];
 }

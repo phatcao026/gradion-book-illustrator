@@ -107,7 +107,7 @@ export function ProjectDetailPage() {
   }
 
   async function startStep(step: PipelineStepNumber) {
-    if (!projectId || !project || (step !== 1 && step !== 2 && step !== 3)) return;
+    if (!projectId || !project) return;
 
     setStarting(true);
     setError(null);
@@ -179,6 +179,32 @@ export function ProjectDetailPage() {
                 </div>
               </div>
               <p className="result-copy">{project.style.text}</p>
+            </section>
+          ) : null}
+
+          {project.pipeline.completedStep >= 4 ? (
+            <section className="result-panel" aria-labelledby="chapters-title">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Selected book scene</p>
+                  <h2 id="chapters-title">Chapter illustration</h2>
+                </div>
+                <span>{project.chapters.length} / 1</span>
+              </div>
+              <div className="chapter-grid">
+                {project.chapters.map((chapter) => (
+                  <article className="chapter-card" key={chapter.id}>
+                    <IllustrationView
+                      illustration={chapter.illustration}
+                      name={chapter.name}
+                    />
+                    <div className="chapter-copy">
+                      <h3>{chapter.name}</h3>
+                      <p>{chapter.prompt}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
             </section>
           ) : null}
 
@@ -255,6 +281,43 @@ function PortraitView({
     );
   }
   return <div className="portrait-placeholder">Portrait not generated</div>;
+}
+
+function IllustrationView({
+  name,
+  illustration,
+}: {
+  name: string;
+  illustration: ProjectDetail['chapters'][number]['illustration'];
+}) {
+  if (illustration?.status === 'COMPLETED' && illustration.imageUrl) {
+    return (
+      <img
+        alt={`Illustration for ${name}`}
+        className="illustration-image"
+        src={illustration.imageUrl}
+      />
+    );
+  }
+  if (illustration?.status === 'GENERATING') {
+    return (
+      <div className="illustration-placeholder generating" role="status">
+        Generating chapter illustration…
+      </div>
+    );
+  }
+  if (illustration?.status === 'QUEUED') {
+    return <div className="illustration-placeholder queued">Illustration queued</div>;
+  }
+  if (illustration?.status === 'FAILED') {
+    return (
+      <div className="illustration-placeholder failed">
+        <span>Illustration failed</span>
+        <small>{illustration.error?.message ?? 'Retry the Illustrations step.'}</small>
+      </div>
+    );
+  }
+  return <div className="illustration-placeholder">Illustration not generated</div>;
 }
 
 function statusLabel(status: ProjectDetail['status']): string {

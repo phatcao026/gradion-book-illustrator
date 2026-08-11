@@ -85,7 +85,7 @@ describe('PipelinePanel persisted states', () => {
     expect(onStart).toHaveBeenCalledWith(2);
   });
 
-  it('starts Portraits explicitly and keeps Chapters unavailable', () => {
+  it('starts Portraits, Chapters, and Illustrations only on explicit actions', () => {
     const onStart = vi.fn();
     const { rerender } = render(
       <PipelinePanel
@@ -103,11 +103,17 @@ describe('PipelinePanel persisted states', () => {
         pipeline={state({ completedStep: 3, nextStep: 4 })}
       />,
     );
-    expect(
-      screen.getByRole('button', {
-        name: /Generate Chapters — available in a later milestone/,
-      }),
-    ).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Chapters' }));
+    expect(onStart).toHaveBeenCalledWith(4);
+
+    rerender(
+      <PipelinePanel
+        onStart={onStart}
+        pipeline={state({ completedStep: 4, nextStep: 5 })}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Generate Illustrations' }));
+    expect(onStart).toHaveBeenCalledWith(5);
   });
 
   it('offers a user-triggered recovery only for a stale running attempt', () => {

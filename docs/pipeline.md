@@ -113,7 +113,7 @@ Decision checkpoint: record the image decoding/storage design and any real simpl
 
 Implementation note: per-character SQLite state, sequential stored-interaction chaining, local-reference rebuilding, validated atomic image storage, authenticated image serving, Portrait UI states, and fake-gateway automated coverage are complete. A real-key paid image call remains deliberately pending and is not claimed as passed.
 
-## Milestone 5 — Chapters and Illustrations (steps 4–5)
+## Milestone 5 — Chapters and Illustrations (steps 4–5; implemented, real-key smoke pending)
 
 Integration:
 
@@ -135,6 +135,8 @@ Test focus: Portraits-before-Chapters ordering, one-chapter cap, text-chain resu
 Exit condition: steps 4 and 5 run only after their required predecessors, persist their outputs, preserve character consistency context, and complete the five-step project without automatic retries.
 
 Decision checkpoint: record the verified two-chain mechanics and any genuine AI override. Clearly separate notebook-observed text behavior from image behavior that still lacks a successful paid-key end-to-end run.
+
+Implementation note: the exact-one Chapter schema, text-chain continuation and recovery, one-call image-chain transition, local portrait-reference rebuilding, atomic Illustration storage, authenticated serving, final UI states, and fake-gateway automated coverage are implemented. The current GA image ID was rechecked against Google's model lifecycle documentation after the notebook's preview ID proved stale. No paid-key image result is claimed yet.
 
 ## Milestone 6 — Final verification and polish
 

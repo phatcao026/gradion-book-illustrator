@@ -5,10 +5,12 @@ import {
   GEMINI_AUTOMATIC_RETRIES,
   GeminiGatewayError,
 } from './gemini-gateway.js';
-import { portraitPrompt } from './prompts.js';
+import { chapterIllustrationPrompt, portraitPrompt } from './prompts.js';
 
 const IMAGE_REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 export const MAX_GENERATED_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_GENERATED_IMAGE_BASE64_CHARS =
+  Math.ceil(MAX_GENERATED_IMAGE_BYTES / 3) * 4;
 
 export interface ImageReference {
   bytes: Buffer;
@@ -29,9 +31,20 @@ export interface PortraitGenerationInput {
   style: string;
 }
 
+export interface ChapterIllustrationGenerationInput {
+  previousInteractionId: string | null;
+  references: ImageReference[];
+  chapterName: string;
+  chapterPrompt: string;
+  style: string;
+}
+
 export interface GeminiImageGateway {
   readonly model: string;
   generatePortrait(input: PortraitGenerationInput): Promise<GeneratedGeminiImage>;
+  generateChapterIllustration(
+    input: ChapterIllustrationGenerationInput,
+  ): Promise<GeneratedGeminiImage>;
 }
 
 export interface GoogleGeminiImageGatewayOptions {
@@ -71,11 +84,42 @@ export class GoogleGeminiImageGateway implements GeminiImageGateway {
       style: input.style,
       hasReferencePortraits: input.references.length > 0,
     });
+    return this.generateImage({
+      previousInteractionId: input.previousInteractionId,
+      references: input.references,
+      prompt,
+      aspectRatio: '9:16',
+    });
+  }
+
+  async generateChapterIllustration(
+    input: ChapterIllustrationGenerationInput,
+  ): Promise<GeneratedGeminiImage> {
+    const prompt = chapterIllustrationPrompt({
+      chapterName: input.chapterName,
+      chapterPrompt: input.chapterPrompt,
+      style: input.style,
+      hasReferencePortraits: input.references.length > 0,
+    });
+    return this.generateImage({
+      previousInteractionId: input.previousInteractionId,
+      references: input.references,
+      prompt,
+      aspectRatio: '16:9',
+    });
+  }
+
+  private async generateImage(input: {
+    previousInteractionId: string | null;
+    references: ImageReference[];
+    prompt: string;
+    aspectRatio: '9:16' | '16:9';
+  }): Promise<GeneratedGeminiImage> {
     const interactionInput: Interactions.CreateModelInteractionParamsNonStreaming['input'] =
       input.references.length === 0
-        ? prompt
+        ? input.prompt
         : [
-            { type: 'text', text: prompt },
+            { type: 'text', text: input.prompt },
             ...input.references.map((reference) => ({
               type: 'image' as const,
               data: reference.bytes.toString('base64'),
@@ -92,7 +136,7 @@ export class GoogleGeminiImageGateway implements GeminiImageGateway {
           response_format: {
             type: 'image',
             mime_type: 'image/png',
-            aspect_ratio: '9:16',
+            aspect_ratio: input.aspectRatio,
             image_size: '1K',
           },
           service_tier: this.serviceTier,
@@ -107,7 +151,7 @@ export class GoogleGeminiImageGateway implements GeminiImageGateway {
       if (!interaction.id || !interaction.output_image?.data) {
         throw new GeminiGatewayError(
           'GEMINI_INVALID_RESPONSE',
-          'Gemini completed the portrait request without returning an image.',
+          'Gemini completed the image request without returning an image.',
         );
       }
 
@@ -124,6 +168,15 @@ export class UnconfiguredGeminiImageGateway implements GeminiImageGateway {
   constructor(readonly model: string) {}
 
   generatePortrait(): Promise<GeneratedGeminiImage> {
+    return Promise.reject(
+      new GeminiGatewayError(
+        'GEMINI_NOT_CONFIGURED',
+        'Gemini is not configured. Add GEMINI_API_KEY to the server environment and retry.',
+      ),
+    );
+  }
+
+  generateChapterIllustration(): Promise<GeneratedGeminiImage> {
     return Promise.reject(
       new GeminiGatewayError(
         'GEMINI_NOT_CONFIGURED',
@@ -148,6 +201,7 @@ function decodeAndValidateImage(
   const normalized = data.replace(/\s/g, '');
   if (
     normalized.length === 0 ||
+    normalized.length > MAX_GENERATED_IMAGE_BASE64_CHARS ||
     normalized.length % 4 !== 0 ||
     !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)
   ) {
@@ -179,7 +233,7 @@ function matchesMimeSignature(bytes: Buffer, mimeType: StoredImageMimeType): boo
 function invalidImageError(): GeminiGatewayError {
   return new GeminiGatewayError(
     'GEMINI_INVALID_RESPONSE',
-    'Gemini returned invalid or oversized portrait image data.',
+    'Gemini returned invalid or oversized image data.',
   );
 }
 
@@ -196,13 +250,13 @@ function normalizeImageError(error: unknown): GeminiGatewayError {
   ) {
     return new GeminiGatewayError(
       'GEMINI_CONTEXT_EXPIRED',
-      'Gemini no longer has the stored portrait context. Retry to rebuild it from completed local portraits.',
+      'Gemini no longer has the stored image context. Retry to rebuild it from completed local portraits.',
       { cause: error },
     );
   }
   return new GeminiGatewayError(
     'GEMINI_REQUEST_FAILED',
-    'Gemini could not generate the requested portrait.',
+    'Gemini could not generate the requested image.',
     { cause: error },
   );
 }

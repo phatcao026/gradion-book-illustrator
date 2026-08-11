@@ -12,6 +12,7 @@ import {
   BOOK_CONTEXT_PROMPT,
   CHARACTERS_PROMPT,
   GENERATED_STYLE_PROMPT,
+  chaptersPrompt,
   userStylePrompt,
 } from './prompts.js';
 
@@ -112,6 +113,36 @@ describe('GoogleGeminiGateway request construction', () => {
       gateway.createCharactersInteraction('expired-style'),
     ).rejects.toMatchObject({ code: 'GEMINI_CONTEXT_EXPIRED' });
     expect(create).toHaveBeenCalledOnce();
+    expect(create.mock.calls[0]?.[1]).toMatchObject({ maxRetries: 0 });
+  });
+
+  it('chains one structured Chapter request from persisted character context', async () => {
+    const create = vi.fn().mockResolvedValue({
+      id: 'chapters-1',
+      output_text: '[{"name":"River","prompt":"A detailed river scene."}]',
+    });
+    const gateway = createGateway({ upload: vi.fn(), create });
+    const characters = [
+      { name: 'Mara', prompt: 'An adult river guide in a green coat.' },
+    ];
+
+    await gateway.createChaptersInteraction('characters-1', characters);
+
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      input: chaptersPrompt(characters),
+      previous_interaction_id: 'characters-1',
+      response_format: {
+        type: 'text',
+        mime_type: 'application/json',
+        schema: {
+          type: 'array',
+          minItems: 1,
+          maxItems: PIPELINE_LIMITS.maxChapters,
+        },
+      },
+      service_tier: 'standard',
+      store: true,
+    });
     expect(create.mock.calls[0]?.[1]).toMatchObject({ maxRetries: 0 });
   });
 });
