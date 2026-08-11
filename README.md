@@ -2,6 +2,10 @@
 
 Local full-stack application for Gradion's book-illustration take-home assessment. The complete five-step pipeline is implemented: Style, adult Characters, Portraits, one Chapter prompt, and one final Illustration. Automated coverage, local browser verification, and a separately labeled owner-performed real-key five-step acceptance are complete.
 
+## Demo video
+
+A short end-to-end demonstration is available here: [Watch the demo](https://drive.google.com/file/d/1Qhpb1FGIpTt4muNJwB0e4ZPx1QnoKigg/view?usp=sharing).
+
 ## Prerequisites
 
 - Node.js 24 or newer (the server uses Node's built-in SQLite module)
@@ -64,3 +68,4 @@ GitHub Actions is configured to run `npm ci`, `npm test`, and `npm run build` on
 The isolated final local pass covers the full automated suite, production build, health endpoint, validation, refresh, server restart, two-tab behavior, duplicate clicks, explicit retry, stale recovery, logout, keyboard affordances, and desktop layout without a Gemini key. On 2026-08-12 the project owner separately completed all five steps through the real UI with a billed Gemini project after the upload and image-format corrections. Model-level visual consistency was not independently scored. See `TESTING.md` for the exact evidence boundaries.
 
 See [TESTING.md](TESTING.md), [DECISIONS.md](DECISIONS.md), and [docs/pipeline.md](docs/pipeline.md) for the test boundary, decisions, and delivery record.
+
