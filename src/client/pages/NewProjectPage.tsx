@@ -51,7 +51,7 @@ export function NewProjectPage() {
   }
 
   return (
-    <main className="content-page narrow-page">
+    <main className="content-page narrow-page" id="main-content" tabIndex={-1}>
       <Link className="back-link" to="/projects">← Back to projects</Link>
       <div className="form-heading">
         <p className="eyebrow">New project</p>

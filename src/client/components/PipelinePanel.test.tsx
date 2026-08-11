@@ -42,6 +42,18 @@ describe('PipelinePanel persisted states', () => {
 
     expect(screen.getByText('Characters is running')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Characters in progress/ })).toBeDisabled();
+    expect(screen.getByText('Characters is running').parentElement).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.getByText('Characters is running').parentElement).toHaveAttribute(
+      'aria-live',
+      'polite',
+    );
+    expect(screen.getByText('Characters').closest('li')).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
   });
 
   it('renders a failed step without carrying the running presentation', () => {

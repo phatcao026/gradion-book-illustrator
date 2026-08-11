@@ -17,6 +17,16 @@ export function AppShell({ user, onSignOut }: AppShellProps) {
 
   return (
     <div className="app-frame">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main-content')?.focus();
+        }}
+      >
+        Skip to content
+      </a>
       <header className="topbar">
         <Link className="brand" to="/projects" aria-label="Book Illustration Studio">
           <span className="brand-mark" aria-hidden="true">G</span>

@@ -27,7 +27,7 @@ export function ProjectListPage() {
   }, []);
 
   return (
-    <main className="content-page">
+    <main className="content-page" id="main-content" tabIndex={-1}>
       <div className="page-heading">
         <div>
           <p className="eyebrow">Your workspace</p>

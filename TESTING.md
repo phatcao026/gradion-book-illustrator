@@ -375,3 +375,76 @@ Content    : {"status":"ok"}
 ```
 
 The smoke job was stopped and its temporary database was removed afterward. This verifies startup, all migrations through M5, and SQLite health only; it is not presented as a real Gemini integration result.
+
+## Milestone 6 coverage
+
+The final polish adds assertions for the keyboard skip link, focus transfer to the main content, a polite live pipeline region, busy state, and current-step semantics. The full suite continues to cover backend ordering, duplicate claims, attempt ownership, partial item failure, explicit retries, stale recovery races, persistence, authentication, local image serving, gateway request contracts, and every persisted frontend state.
+
+Manual browser acceptance on 2026-08-11 used `npm.cmd run dev` with isolated `./data/m6-verification.sqlite`, `./uploads/m6-verification`, and a one-minute stale threshold. It produced the following real observations:
+
+1. Empty identity submission showed the expected validation alert; valid local test identity data signed in successfully.
+2. A pasted-text project was created by double-clicking the submit action, and the project list contained exactly one row.
+3. Double-clicking Generate Style without a configured key produced one persisted failed state with the expected configuration message; explicit Retry returned to the same honestly reported failure.
+4. Refresh preserved the project and failed state. A second browser tab saw the same single project.
+5. Stopping and restarting the local server against the same SQLite/upload paths preserved the session, project, book text, and pipeline state.
+6. A deliberately aged running attempt was inserted into only the isolated verification database. The UI detected it as stale, and the real Recover action moved it to `INTERRUPTED` with Retry available.
+7. Signing out in one tab returned that tab to Identity; refreshing the other tab also returned it to Identity.
+8. Desktop inspection at a reported 1280 px viewport showed a 1100 px content region, all five step cards within bounds, and no horizontal document overflow. Browser viewport emulation did not apply a smaller viewport, so a manual mobile-width pass is not claimed.
+
+No `.env` or `GEMINI_API_KEY` was present. Partial paid-image failure and end-to-end Gemini model behavior were therefore not manually exercised. Their UI/storage/retry paths remain covered by gateway fakes and real repository/API integration tests, but no real paid response or character consistency claim is made.
+
+## Milestone 6 actual run
+
+The first final test command was launched concurrently with the build. It was not counted as a pass: one Vitest worker exited without an assertion failure, leaving 9 of 10 files and 61 of 62 tests executed.
+
+```text
+Test Files  9 passed (10)
+     Tests  61 passed (62)
+    Errors  1 error
+
+Caused by: Error: Worker exited unexpectedly
+```
+
+Because that run was incomplete, `npm.cmd test` was rerun by itself and completed successfully:
+
+```text
+> gradion-book-illustrator@0.1.0 test
+> vitest run
+
+ RUN  v4.1.10 D:/Gradion/gradion-book-illustrator
+
+ Test Files  10 passed (10)
+      Tests  62 passed (62)
+   Start at  23:42:37
+   Duration  3.11s (transform 1.11s, setup 2.97s, import 5.62s, tests 8.04s, environment 3.33s)
+```
+
+`npm.cmd run build` completed successfully:
+
+```text
+> gradion-book-illustrator@0.1.0 build
+> npm run typecheck:client && npm run build:client && npm run build:server
+
+> gradion-book-illustrator@0.1.0 typecheck:client
+> tsc -p tsconfig.client.json --noEmit
+
+> gradion-book-illustrator@0.1.0 build:client
+> vite build
+
+vite v8.2.1 building client environment for production...
+✓ 111 modules transformed.
+dist/client/index.html                   0.48 kB │ gzip:  0.30 kB
+dist/client/assets/index-BYywqCyW.css   11.26 kB │ gzip:  3.19 kB
+dist/client/assets/index-B332v8gO.js   307.87 kB │ gzip: 94.12 kB
+✓ built in 518ms
+
+> gradion-book-illustrator@0.1.0 build:server
+> tsc -p tsconfig.server.json
+```
+
+The final development-runtime health check returned:
+
+```text
+HEALTH_STATUS=200
+HEALTH_BODY={"status":"ok"}
+```

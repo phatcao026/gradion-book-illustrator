@@ -1,6 +1,6 @@
 # Gradion Book Illustrator
 
-Local full-stack application for Gradion's book-illustration take-home assessment. The complete five-step pipeline is implemented: Style, adult Characters, Portraits, one Chapter prompt, and one final Illustration. Real paid-key image verification remains a separate final acceptance step.
+Local full-stack application for Gradion's book-illustration take-home assessment. The complete five-step pipeline is implemented: Style, adult Characters, Portraits, one Chapter prompt, and one final Illustration. Automated coverage and local browser acceptance are complete; real paid-key image verification remains a separate final acceptance step.
 
 ## Prerequisites
 
@@ -56,5 +56,9 @@ During development, open `http://localhost:5173`. The backend listens on `http:/
 The project uses one npm package and one `npm run dev` process supervisor to keep setup small. SQLite and local filesystem storage require no external service, so Docker would add setup overhead without solving a current dependency.
 
 The pipeline uses stored Gemini Interactions and persists each reusable identifier or validated output before the next external call. Portraits are generated sequentially; the Chapter prompt resumes the text chain from Characters; and the final 16:9 Illustration resumes the portrait chain or rebuilds from completed local portraits. Images are written immediately and retries skip completed work. The SDK is configured with zero automatic retries; only Generate/Retry buttons can issue a new attempt. Automated tests use fakes only at gateway boundaries and do not claim that a real API call passed.
+
+## Verification boundary
+
+The final local pass covers the full automated suite, production build, health endpoint, validation, refresh, server restart, two-tab behavior, duplicate clicks, explicit retry, stale recovery, logout, keyboard affordances, and desktop layout. No `GEMINI_API_KEY` was configured during that pass, so the real paid text/image pipeline and model-level character consistency are still unverified. See `TESTING.md` for the exact commands and evidence.
 
 See [TESTING.md](TESTING.md), [DECISIONS.md](DECISIONS.md), and [docs/pipeline.md](docs/pipeline.md) for the test boundary, decisions, and future milestones.

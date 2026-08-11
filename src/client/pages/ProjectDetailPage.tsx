@@ -138,7 +138,7 @@ export function ProjectDetailPage() {
   }
 
   return (
-    <main className="content-page">
+    <main className="content-page" id="main-content" tabIndex={-1}>
       <Link className="back-link" to="/projects">← Back to projects</Link>
       {error ? <div className="notice error" role="alert">{error}</div> : null}
       {!project && !error ? <div className="notice" role="status">Loading project…</div> : null}

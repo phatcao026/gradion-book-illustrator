@@ -138,7 +138,7 @@ Decision checkpoint: record the verified two-chain mechanics and any genuine AI 
 
 Implementation note: the exact-one Chapter schema, text-chain continuation and recovery, one-call image-chain transition, local portrait-reference rebuilding, atomic Illustration storage, authenticated serving, final UI states, and fake-gateway automated coverage are implemented. The current GA image ID was rechecked against Google's model lifecycle documentation after the notebook's preview ID proved stale. No paid-key image result is claimed yet.
 
-## Milestone 6 — Final verification and polish
+## Milestone 6 — Final verification and polish (locally verified; paid-key acceptance pending)
 
 - Exercise refresh, logout, server restart, second tab, double-click, partial item failure, retry, and stale recovery manually.
 - Polish responsive layouts, keyboard navigation, focus behavior, loading transitions, validation feedback, and layout stability; do not defer first implementation of any required screen to this milestone.
@@ -151,5 +151,9 @@ Implementation note: the exact-one Chapter schema, text-chain continuation and r
 Exit condition: all required automated and manual checks have real recorded evidence, documentation matches the implementation, and no unsupported success claim remains.
 
 Decision checkpoint: add only final decisions that actually arise during verification; do not backfill missing AI overrides.
+
+Verification note: the final local pass exercised validation, pasted-text creation, duplicate clicks, refresh, server restart, a second tab, explicit retry, logout, and stale recovery through the real UI against isolated SQLite/filesystem runtime data. Stale recovery used a deliberately aged row in that isolated verification database, then the real Recover action and conditional update. Desktop visual inspection found no horizontal overflow; final polish added a keyboard skip link, live pipeline announcements, current-step semantics, narrow-layout wrapping, and corrected the generating-state color variables. The automated suite and build results are recorded in `TESTING.md`.
+
+The repository had no `.env` or `GEMINI_API_KEY` during verification. Consequently, partial paid-image failure and the real end-to-end Gemini text/image flow were not manually exercised, and the complete real-image pipeline is not claimed as accepted. Those remain the only external-cost acceptance items.
 
 No public deployment, Docker setup, automatic Gemini retry loop, or bonus media features are planned within the required scope.

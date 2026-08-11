@@ -52,7 +52,11 @@ export function PipelinePanel({
                 : '';
 
           return (
-            <li className={className} key={step}>
+            <li
+              aria-current={className === 'current' ? 'step' : undefined}
+              className={className}
+              key={step}
+            >
               <span>{number}</span>
               {formatStepName(step)}
             </li>
@@ -60,7 +64,11 @@ export function PipelinePanel({
         })}
       </ol>
 
-      <div className={`pipeline-state ${pipeline.runState.toLowerCase()}`}>
+      <div
+        aria-busy={pipeline.runState === 'RUNNING'}
+        aria-live="polite"
+        className={`pipeline-state ${pipeline.runState.toLowerCase()}`}
+      >
         {canEditStyle ? (
           <div className="style-field">
             <label htmlFor="pipeline-style-input">Optional art style</label>

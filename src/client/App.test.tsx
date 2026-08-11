@@ -47,6 +47,13 @@ describe('frontend flows', () => {
       await screen.findByRole('heading', { name: 'No projects yet' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'New project' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute(
+      'href',
+      '#main-content',
+    );
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+    fireEvent.click(screen.getByRole('link', { name: 'Skip to content' }));
+    expect(screen.getByRole('main')).toHaveFocus();
   });
 
   it('validates the new-project title and source before sending a request', async () => {

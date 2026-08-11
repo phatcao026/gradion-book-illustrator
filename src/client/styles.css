@@ -40,6 +40,30 @@ a {
   color: inherit;
 }
 
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: var(--white);
+  background: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 120ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.content-page:focus {
+  outline: none;
+}
+
 h1,
 h2,
 p {
@@ -194,6 +218,11 @@ textarea:focus {
 .secondary-button:hover {
   color: var(--white);
   background: var(--ink);
+}
+
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .full-width {
@@ -720,8 +749,8 @@ textarea:focus {
 
 .portrait-placeholder.generating,
 .illustration-placeholder.generating {
-  border-color: var(--grad-orange);
-  color: var(--grad-ink);
+  border-color: var(--orange);
+  color: var(--ink);
   background: #fff8df;
 }
 
@@ -823,6 +852,20 @@ textarea:focus {
   .content-page {
     width: min(100% - 28px, 1100px);
     padding-top: 38px;
+  }
+
+  .page-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-heading .primary-button {
+    width: 100%;
+  }
+
+  .section-heading {
+    align-items: start;
+    flex-wrap: wrap;
   }
 
   .project-row {
