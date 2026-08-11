@@ -92,10 +92,6 @@ export class GoogleGeminiGateway implements GeminiGateway {
         config: {
           displayName,
           mimeType: 'text/plain',
-          httpOptions: {
-            timeout: REQUEST_TIMEOUT_MS,
-            retryOptions: { attempts: GEMINI_AUTOMATIC_RETRIES },
-          },
         },
       });
 

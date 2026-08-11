@@ -133,9 +133,10 @@ export class GoogleGeminiImageGateway implements GeminiImageGateway {
           model: this.model,
           input: interactionInput,
           previous_interaction_id: input.previousInteractionId ?? undefined,
+          response_modalities: ['image'],
           response_format: {
             type: 'image',
-            mime_type: 'image/png',
+            mime_type: 'image/jpeg',
             aspect_ratio: input.aspectRatio,
             image_size: '1K',
           },
@@ -239,13 +240,12 @@ function invalidImageError(): GeminiGatewayError {
 
 function normalizeImageError(error: unknown): GeminiGatewayError {
   if (error instanceof GeminiGatewayError) return error;
-  const candidate = error as { status?: unknown; message?: unknown };
-  const status = typeof candidate?.status === 'number' ? candidate.status : null;
-  const detail = typeof candidate?.message === 'string' ? candidate.message : '';
+  const { status, providerStatus, detail, name } = readProviderError(error);
+  const searchableDetail = `${providerStatus} ${detail}`;
   if (
     (status === 400 || status === 404) &&
     /(previous interaction|interaction).*(expired|not found|invalid)|expired.*interaction/i.test(
-      detail,
+      searchableDetail,
     )
   ) {
     return new GeminiGatewayError(
@@ -254,9 +254,114 @@ function normalizeImageError(error: unknown): GeminiGatewayError {
       { cause: error },
     );
   }
+
+  if (
+    /billing|billed users?|paid tier|free[_ -]?tier.*(?:limit|quota).*0/i.test(
+      searchableDetail,
+    )
+  ) {
+    return imageRequestError(
+      'Gemini image generation is not enabled for this API key project. Verify that the key belongs to the billed project and that its image quota is active in Google AI Studio.',
+      error,
+    );
+  }
+  if (status === 401) {
+    return imageRequestError(
+      'Gemini rejected the API key. Verify GEMINI_API_KEY and restart the server.',
+      error,
+    );
+  }
+  if (status === 403) {
+    return imageRequestError(
+      'This API key project does not have permission to use Gemini image generation. Check its billing project and API access.',
+      error,
+    );
+  }
+  if (status === 429 || /resource[_ -]?exhausted|quota|rate limit/i.test(searchableDetail)) {
+    return imageRequestError(
+      'Gemini image quota is unavailable or exhausted for this project. Check the model quota in Google AI Studio before retrying.',
+      error,
+    );
+  }
+  if (
+    status === 408 ||
+    /timeout/i.test(name) ||
+    /timed? out|deadline exceeded/i.test(searchableDetail)
+  ) {
+    return imageRequestError(
+      'The Gemini image request timed out. Check the network and retry this step once.',
+      error,
+    );
+  }
+  if (status === 400) {
+    return imageRequestError(
+      'Gemini rejected the image request as invalid. Check the configured image model and request support for this API key project.',
+      error,
+    );
+  }
+  if (status === 404) {
+    return imageRequestError(
+      'The configured Gemini image model or image endpoint was not found for this API key project.',
+      error,
+    );
+  }
+  if (status !== null && status >= 500) {
+    return imageRequestError(
+      'Gemini image generation is temporarily unavailable. Retry this step later.',
+      error,
+    );
+  }
   return new GeminiGatewayError(
     'GEMINI_REQUEST_FAILED',
     'Gemini could not generate the requested image.',
     { cause: error },
   );
+}
+
+function imageRequestError(message: string, cause: unknown): GeminiGatewayError {
+  return new GeminiGatewayError('GEMINI_REQUEST_FAILED', message, { cause });
+}
+
+function readProviderError(error: unknown): {
+  status: number | null;
+  providerStatus: string;
+  detail: string;
+  name: string;
+} {
+  const candidate = asRecord(error);
+  const body = asRecord(candidate?.error);
+  const nestedBody = asRecord(body?.error);
+  return {
+    status: firstNumber(
+      candidate?.status,
+      candidate?.statusCode,
+      body?.code,
+      nestedBody?.code,
+    ),
+    providerStatus: firstString(
+      body?.status,
+      nestedBody?.status,
+      candidate?.code,
+    ),
+    detail: firstString(
+      body?.message,
+      nestedBody?.message,
+      candidate?.message,
+    ),
+    name: firstString(candidate?.name),
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function firstNumber(...values: unknown[]): number | null {
+  return values.find((value): value is number => typeof value === 'number') ?? null;
+}
+
+function firstString(...values: unknown[]): string {
+  return values.find((value): value is string => typeof value === 'string') ?? '';
 }

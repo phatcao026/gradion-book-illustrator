@@ -448,3 +448,52 @@ The final development-runtime health check returned:
 HEALTH_STATUS=200
 HEALTH_BODY={"status":"ok"}
 ```
+
+## Post-M6 Gemini Files upload correction
+
+On 2026-08-12, the first owner-triggered real-key Style attempt failed before model generation with `The book could not be uploaded to Gemini.` The key was present and both the Models and Files metadata endpoints returned HTTP 200. A deliberately tiny diagnostic text upload exposed the hidden SDK error: the per-upload `config.httpOptions` caused the request path to become `/v1beta/upload/v1beta/files`, which returned 404. The documented REST upload endpoint returned 200.
+
+Keeping the client-level timeout and zero-retry settings but removing only `files.upload().config.httpOptions` produced this real diagnostic result:
+
+```text
+FIXED_SHAPE_UPLOAD=SUCCESS
+FIXED_SHAPE_NAME_PRESENT=true
+FIXED_SHAPE_URI_PRESENT=true
+FIXED_SHAPE_STATE=ACTIVE
+FIXED_SHAPE_DELETE=SUCCESS
+```
+
+The diagnostic file was deleted immediately. No model interaction, content generation, portrait, or paid image request occurred, so this proves only the Files upload boundary.
+
+Focused regression test:
+
+```text
+Test Files  1 passed (1)
+     Tests  5 passed (5)
+```
+
+Final `npm.cmd test` after the correction:
+
+```text
+Test Files  10 passed (10)
+     Tests  62 passed (62)
+  Duration  2.96s
+```
+
+Final `npm.cmd run build` completed client type-checking, the 111-module Vite build, and server TypeScript compilation successfully.
+
+## Post-M6 image-provider error diagnostics
+
+After an owner-triggered Portraits request returned only the generic image failure message, the image gateway was updated to distinguish billing/access, authentication, quota, timeout, invalid-request, missing-model, and provider-server failures from the SDK's HTTP status and JSON error body. No real image request was made while implementing or verifying this diagnostic change.
+
+Final `npm.cmd test` result on 2026-08-12:
+
+```text
+Test Files  10 passed (10)
+     Tests  68 passed (68)
+  Duration  5.73s
+```
+
+Final `npm.cmd run build` completed client type-checking, the 111-module Vite build, and server TypeScript compilation successfully.
+
+The subsequent owner-triggered retry exposed HTTP 400 `INVALID_ARGUMENT`. Comparing the request against the current Interactions schema found that image output format accepts `image/jpeg`, while the gateway requested `image/png`. The gateway now requests JPEG and explicitly requests the image response modality. The local storage and response validation paths already support JPEG. After this correction, `npm.cmd test` again passed all 68 tests in 10 files (2.83s), and `npm.cmd run build` again completed successfully. No additional real image request was made by the implementation or verification commands.

@@ -17,7 +17,7 @@ import {
 } from './prompts.js';
 
 describe('GoogleGeminiGateway request construction', () => {
-  it('uploads text with automatic retries disabled', async () => {
+  it('uploads text without overriding the SDK resumable-upload options', async () => {
     const upload = vi.fn().mockResolvedValue({
       name: 'files/book',
       uri: 'gemini://book',
@@ -33,13 +33,11 @@ describe('GoogleGeminiGateway request construction', () => {
     expect(upload).toHaveBeenCalledOnce();
     const request = upload.mock.calls[0]?.[0];
     expect(request.file).toBeInstanceOf(Blob);
-    expect(request.config).toMatchObject({
+    expect(request.config).toEqual({
       displayName: 'Story.txt',
       mimeType: 'text/plain',
-      httpOptions: {
-        retryOptions: { attempts: GEMINI_AUTOMATIC_RETRIES },
-      },
     });
+    expect(request.config).not.toHaveProperty('httpOptions');
   });
 
   it('creates a stored Standard-tier book and generated-Style chain', async () => {

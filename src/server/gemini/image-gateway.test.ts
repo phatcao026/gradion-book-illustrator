@@ -45,9 +45,10 @@ describe('GoogleGeminiImageGateway', () => {
           hasReferencePortraits: false,
         }),
         previous_interaction_id: undefined,
+        response_modalities: ['image'],
         response_format: {
           type: 'image',
-          mime_type: 'image/png',
+          mime_type: 'image/jpeg',
           aspect_ratio: '9:16',
           image_size: '1K',
         },
@@ -128,6 +129,55 @@ describe('GoogleGeminiImageGateway', () => {
     expect(create).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    [
+      {
+        status: 429,
+        error: {
+          code: 429,
+          status: 'RESOURCE_EXHAUSTED',
+          message: 'Free tier quota limit 0 for this image model.',
+        },
+      },
+      'Gemini image generation is not enabled for this API key project.',
+    ],
+    [
+      { status: 401, error: { message: 'API key not valid.' } },
+      'Gemini rejected the API key.',
+    ],
+    [
+      { status: 403, error: { status: 'PERMISSION_DENIED' } },
+      'This API key project does not have permission',
+    ],
+    [
+      { status: 429, error: { status: 'RESOURCE_EXHAUSTED' } },
+      'Gemini image quota is unavailable or exhausted',
+    ],
+    [
+      { name: 'APIConnectionTimeoutError', message: 'Request timed out.' },
+      'The Gemini image request timed out.',
+    ],
+    [
+      { status: 400, error: { status: 'INVALID_ARGUMENT' } },
+      'Gemini rejected the image request as invalid.',
+    ],
+  ])('returns an actionable image-provider error for %j', async (providerError, message) => {
+    const gateway = createGateway(vi.fn().mockRejectedValue(providerError));
+
+    await expect(
+      gateway.generatePortrait({
+        previousInteractionId: null,
+        references: [],
+        characterName: 'Mara',
+        characterPrompt: 'An adult river guide.',
+        style: 'Watercolor.',
+      }),
+    ).rejects.toMatchObject({
+      code: 'GEMINI_REQUEST_FAILED',
+      message: expect.stringContaining(message),
+    });
+  });
+
   it('generates one 16:9 Chapter illustration directly from portrait context', async () => {
     const create = vi.fn().mockResolvedValue({
       id: 'illustration-1',
@@ -154,9 +204,10 @@ describe('GoogleGeminiImageGateway', () => {
           hasReferencePortraits: false,
         }),
         previous_interaction_id: 'portrait-2',
+        response_modalities: ['image'],
         response_format: {
           type: 'image',
-          mime_type: 'image/png',
+          mime_type: 'image/jpeg',
           aspect_ratio: '16:9',
           image_size: '1K',
         },
