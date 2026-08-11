@@ -4,7 +4,7 @@ This log contains only choices that were actually made while building the applic
 
 ## One local TypeScript stack with SQLite and filesystem storage
 
-The initial AI analysis recommended TypeScript throughout, React + Vite, Express, SQLite, and one npm package. I accepted that direction because a single language and dependency manifest keep a time-boxed local assessment easy to run. SQLite owns relational and pipeline state, while book text and later image bytes belong on the filesystem; Node's built-in `node:sqlite` avoids a native package. The accepted costs are Node 24 or newer, explicit migrations, and a clear client/server boundary enforced by separate TypeScript configurations rather than separate packages.
+The initial AI analysis recommended TypeScript throughout, React + Vite, Express, SQLite, and one npm package. I accepted that direction because a single language and dependency manifest keep a time-boxed local assessment easy to run. SQLite owns relational and pipeline state, while book text and later image bytes belong on the filesystem; Node's built-in `node:sqlite` avoids a native package. The accepted costs are Node 24 or newer, explicit migrations, and a clear client/server boundary enforced by separate TypeScript configurations rather than separate packages. For the final bonus I kept the same Node 24 boundary in a minimal Ubuntu CI job for `main` pushes and pull requests; it receives no Gemini secret and only runs the deterministic install, test, and build harness.
 
 ## Opaque database sessions instead of JWT
 
@@ -40,4 +40,4 @@ For the final illustration, the notebook uses a transition-only image interactio
 
 ## If I had one more day
 
-I would run the complete pipeline with a paid key, deliberately interrupt both image steps, and use the remaining time for responsive and accessibility polish. Automated boundaries are covered, but real model behavior and cross-restart recovery remain the highest-value final evidence.
+The paid-key five-step happy path is now owner-accepted. With one more day, I would deliberately interrupt both real image steps and verify resume behavior across a process restart, then perform a measured mobile-browser and visual-consistency review. Those failure and quality boundaries now provide more evidence than adding another media feature.

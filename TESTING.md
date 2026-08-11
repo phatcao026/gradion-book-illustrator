@@ -497,3 +497,29 @@ Test Files  10 passed (10)
 Final `npm.cmd run build` completed client type-checking, the 111-module Vite build, and server TypeScript compilation successfully.
 
 The subsequent owner-triggered retry exposed HTTP 400 `INVALID_ARGUMENT`. Comparing the request against the current Interactions schema found that image output format accepts `image/jpeg`, while the gateway requested `image/png`. The gateway now requests JPEG and explicitly requests the image response modality. The local storage and response validation paths already support JPEG. After this correction, `npm.cmd test` again passed all 68 tests in 10 files (2.83s), and `npm.cmd run build` again completed successfully. No additional real image request was made by the implementation or verification commands.
+
+## Owner-performed real-key five-step acceptance
+
+On 2026-08-12, after restarting the corrected application, the project owner reported completing all five ordered steps through the real UI with a billed Gemini API project:
+
+1. Style completed.
+2. Characters completed.
+3. Portraits completed and produced the bounded portrait set.
+4. Chapters completed and produced the single chapter prompt.
+5. Illustrations completed and produced the final image.
+
+This is owner-performed acceptance evidence, not an agent-run command or an automated integration test. No API key, Google project identifier, billing amount, raw provider response, or independent character-consistency judgment is claimed here.
+
+## Bonus CI preparation actual local run
+
+The CI workflow is configured for Ubuntu and Node.js 24, but it cannot be claimed as a successful GitHub-hosted run until the commit is pushed and GitHub Actions reports its result. Before handoff, the same test and build scripts were run locally on Node.js `v24.15.0` without a Gemini key.
+
+`npm.cmd test` completed successfully:
+
+```text
+Test Files  10 passed (10)
+     Tests  68 passed (68)
+  Duration  6.20s
+```
+
+`npm.cmd run build` completed client type-checking, a 111-module Vite production build, and server TypeScript compilation successfully.

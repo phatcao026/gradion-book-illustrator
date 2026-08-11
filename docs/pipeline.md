@@ -64,7 +64,7 @@ Exit condition: pipeline state survives refresh and restart, duplicate starts ar
 
 Decision checkpoint: record the actual progress model, duplicate-execution strategy, stale threshold/recovery design, and any genuine AI proposal that was rejected or simplified.
 
-## Milestone 3 — Style and Characters (steps 1–2; implemented, real-key smoke pending)
+## Milestone 3 — Style and Characters (steps 1–2; completed and real-key accepted)
 
 Integration:
 
@@ -87,9 +87,9 @@ Exit condition: steps 1 and 2 run only in order, survive refresh/restart, expose
 
 Decision checkpoint: record the real REST-versus-SDK/model choice, structured validation approach, and any genuine AI override. Do not claim image mechanics were verified here.
 
-Implementation note: the official `@google/genai` gateway, stored interaction chain, intermediate SQLite persistence, explicit rehydration, Style/Character UI, polling, and fake-gateway automated coverage are complete. A real-key smoke call remains deliberately pending explicit project-owner approval; M3 should be marked fully completed only after that result is recorded honestly.
+Implementation note: the official `@google/genai` gateway, stored interaction chain, intermediate SQLite persistence, explicit rehydration, Style/Character UI, polling, and fake-gateway automated coverage are complete. On 2026-08-12 the project owner completed both steps through the real-key UI flow after the Gemini Files upload correction. This is recorded as owner-performed acceptance, not as an agent-run automated integration test.
 
-## Milestone 4 — Portraits (step 3; implemented, real-key smoke pending)
+## Milestone 4 — Portraits (step 3; completed and real-key accepted)
 
 Integration:
 
@@ -111,9 +111,9 @@ Exit condition: step 3 cannot run before Characters, generates no more than two 
 
 Decision checkpoint: record the image decoding/storage design and any real simplification or correction of AI output. Do not claim a real image response passed unless a paid-key run actually succeeded.
 
-Implementation note: per-character SQLite state, sequential stored-interaction chaining, local-reference rebuilding, validated atomic image storage, authenticated image serving, Portrait UI states, and fake-gateway automated coverage are complete. A real-key paid image call remains deliberately pending and is not claimed as passed.
+Implementation note: per-character SQLite state, sequential stored-interaction chaining, local-reference rebuilding, validated atomic image storage, authenticated image serving, Portrait UI states, and fake-gateway automated coverage are complete. On 2026-08-12 the project owner generated the bounded portrait set through the real paid-key UI flow after correcting the Interactions image response format to JPEG.
 
-## Milestone 5 — Chapters and Illustrations (steps 4–5; implemented, real-key smoke pending)
+## Milestone 5 — Chapters and Illustrations (steps 4–5; completed and real-key accepted)
 
 Integration:
 
@@ -134,11 +134,11 @@ Test focus: Portraits-before-Chapters ordering, one-chapter cap, text-chain resu
 
 Exit condition: steps 4 and 5 run only after their required predecessors, persist their outputs, preserve character consistency context, and complete the five-step project without automatic retries.
 
-Decision checkpoint: record the verified two-chain mechanics and any genuine AI override. Clearly separate notebook-observed text behavior from image behavior that still lacks a successful paid-key end-to-end run.
+Decision checkpoint: record the verified two-chain mechanics and any genuine AI override. Clearly separate automated gateway coverage, notebook-observed behavior, and owner-performed paid-key acceptance.
 
-Implementation note: the exact-one Chapter schema, text-chain continuation and recovery, one-call image-chain transition, local portrait-reference rebuilding, atomic Illustration storage, authenticated serving, final UI states, and fake-gateway automated coverage are implemented. The current GA image ID was rechecked against Google's model lifecycle documentation after the notebook's preview ID proved stale. No paid-key image result is claimed yet.
+Implementation note: the exact-one Chapter schema, text-chain continuation and recovery, one-call image-chain transition, local portrait-reference rebuilding, atomic Illustration storage, authenticated serving, final UI states, and fake-gateway automated coverage are implemented. The current GA image ID was rechecked against Google's model lifecycle documentation after the notebook's preview ID proved stale. On 2026-08-12 the project owner completed Chapters and generated the final Illustration through the real paid-key UI flow.
 
-## Milestone 6 — Final verification and polish (locally verified; paid-key acceptance pending)
+## Milestone 6 — Final verification and polish (completed; owner acceptance recorded)
 
 - Exercise refresh, logout, server restart, second tab, double-click, partial item failure, retry, and stale recovery manually.
 - Polish responsive layouts, keyboard navigation, focus behavior, loading transitions, validation feedback, and layout stability; do not defer first implementation of any required screen to this milestone.
@@ -146,7 +146,7 @@ Implementation note: the exact-one Chapter schema, text-chain continuation and r
 - Review `README.md`, environment variables, `AGENTS.md`, `DECISIONS.md`, AI artifacts, and Git history.
 - State explicitly in `README.md` that Docker is skipped because SQLite and local filesystem storage require no external service and Docker would add setup overhead.
 - Curate `DECISIONS.md` to the strongest genuine decisions without inventing pushback; include the required one-more-day answer.
-- Run a paid-key end-to-end image check before claiming the complete real image pipeline works.
+- Record the project owner's paid-key end-to-end acceptance separately from agent-run automated and local verification evidence.
 
 Exit condition: all required automated and manual checks have real recorded evidence, documentation matches the implementation, and no unsupported success claim remains.
 
@@ -154,6 +154,19 @@ Decision checkpoint: add only final decisions that actually arise during verific
 
 Verification note: the final local pass exercised validation, pasted-text creation, duplicate clicks, refresh, server restart, a second tab, explicit retry, logout, and stale recovery through the real UI against isolated SQLite/filesystem runtime data. Stale recovery used a deliberately aged row in that isolated verification database, then the real Recover action and conditional update. Desktop visual inspection found no horizontal overflow; final polish added a keyboard skip link, live pipeline announcements, current-step semantics, narrow-layout wrapping, and corrected the generating-state color variables. The automated suite and build results are recorded in `TESTING.md`.
 
-The repository had no `.env` or `GEMINI_API_KEY` during verification. Consequently, partial paid-image failure and the real end-to-end Gemini text/image flow were not manually exercised, and the complete real-image pipeline is not claimed as accepted. Those remain the only external-cost acceptance items.
+The isolated M6 verification run had no `.env` or `GEMINI_API_KEY`, so that specific run did not exercise external-cost behavior. The later owner-performed acceptance on 2026-08-12 completed all five real-key steps after the upload and image-format corrections. The two evidence sets remain labeled separately in `TESTING.md`.
 
-No public deployment, Docker setup, automatic Gemini retry loop, or bonus media features are planned within the required scope.
+No public deployment, Docker setup, automatic Gemini retry loop, or bonus media features are planned. The only selected bonus is a secret-free CI workflow that runs the existing automated harness on `main` pushes and pull requests.
+
+## Owner-performed real-key acceptance
+
+On 2026-08-12, after the Gemini Files upload and Interactions JPEG output corrections, the project owner restarted the application and reported completing the real UI flow for all five ordered steps: Style, Characters, Portraits, Chapters, and Illustrations. All five result sections were generated successfully. This acceptance used the owner's billed Gemini project and is intentionally distinguished from automated tests and agent-run terminal evidence. No API key, project identifier, billing amount, or unsupported visual-consistency claim is recorded.
+
+## Bonus milestone — CI harness
+
+- Run `npm ci`, `npm test`, and `npm run build` on Ubuntu with Node.js 24.
+- Trigger on pushes to `main` and on pull requests.
+- Use npm dependency caching and read-only repository permissions.
+- Do not configure Gemini secrets; automated tests continue to use gateway fakes and local boundaries.
+
+Exit condition: a clean checkout can install, test, and build without external services or paid API calls.
