@@ -13,25 +13,44 @@ A short end-to-end demonstration is available here: [Watch the demo](https://dri
 
 ## Setup
 
+Install dependencies:
+
 ```bash
 npm install
+```
+
+Create a local environment file:
+
+```bash
 cp .env.example .env
 ```
 
-On PowerShell, use `Copy-Item .env.example .env`. The app and health endpoint run without a Gemini key, but starting Style will persist a clear configuration failure until `GEMINI_API_KEY` is set.
+On PowerShell, use:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The application and health endpoint can run without Gemini. To use the complete five-step illustration pipeline, open `.env` and set your Gemini API key:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+Keep the real API key local. The `.env` file is ignored by Git and must never be committed.
 
 Current environment variables:
 
 - `PORT`: Express port; defaults to `3000`.
 - `DATABASE_PATH`: local SQLite file; defaults to `./data/gradion.sqlite`.
-- `UPLOADS_DIRECTORY`: local book/image root; defaults to `./uploads`.
+- `UPLOADS_DIRECTORY`: local book and generated-image directory; defaults to `./uploads`.
 - `STALE_ATTEMPT_MINUTES`: age at which a running attempt can be manually recovered; defaults to `10`.
-- `GEMINI_API_KEY`: Gemini Developer API key; no default and never committed.
-- `GEMINI_TEXT_MODEL`: current text model; defaults to `gemini-3.6-flash`.
-- `GEMINI_IMAGE_MODEL`: current portrait model; defaults to `gemini-3.1-flash-image`.
+- `GEMINI_API_KEY`: Gemini Developer API key; required for the five Gemini pipeline steps.
+- `GEMINI_TEXT_MODEL`: text model; defaults to `gemini-3.6-flash`.
+- `GEMINI_IMAGE_MODEL`: image model; defaults to `gemini-3.1-flash-image`.
 - `GEMINI_SERVICE_TIER`: fixed to `standard`; another value is rejected at startup.
 
-Session cookies are marked `Secure` automatically when `NODE_ENV=production`; local HTTP development keeps that flag disabled.
+Session cookies are marked `Secure` automatically when `NODE_ENV=production`. Local HTTP development keeps this flag disabled.
 
 ## Commands
 
